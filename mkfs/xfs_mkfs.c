@@ -744,6 +744,11 @@ struct opt_params {
 	},
 };
 
+static void print_conflict_struct(
+	struct opt_params *opt,
+	struct subopt_param *subopt,
+	struct subopt_conflict *conflict);
+
 #define TERABYTES(count, blog)	((__uint64_t)(count) << (40 - (blog)))
 #define GIGABYTES(count, blog)	((__uint64_t)(count) << (30 - (blog)))
 #define MEGABYTES(count, blog)	((__uint64_t)(count) << (20 - (blog)))
@@ -1351,10 +1356,9 @@ check_opt(
 			break;
 		if (conflict_opt.test_values)
 			break;
-		if (opt->subopt_params[conflict_opt.subopt].seen ||
-		    opt->subopt_params[conflict_opt.subopt].str_seen) {
-			conflict(opt->name, (char **)opt->subopts,
-				 conflict_opt.subopt, index);
+		if (opts[conflict_opt.opt].subopt_params[conflict_opt.subopt].seen ||
+		    opts[conflict_opt.opt].subopt_params[conflict_opt.subopt].str_seen) {
+			print_conflict_struct(opt, sp, &conflict_opt);
 		}
 	}
 }
@@ -1379,13 +1383,12 @@ check_opt_value(
 			break;
 		if (!conflict_opt.test_values)
 			break;
-		if ((opt->subopt_params[conflict_opt.subopt].seen ||
-				    opt->subopt_params[conflict_opt.subopt].str_seen) &&
-		    opt->subopt_params[conflict_opt.subopt].value
+		if ((opts[conflict_opt.opt].subopt_params[conflict_opt.subopt].seen ||
+		     opts[conflict_opt.opt].subopt_params[conflict_opt.subopt].str_seen) &&
+		    opts[conflict_opt.opt].subopt_params[conflict_opt.subopt].value
 				== conflict_opt.invalid_value &&
 		    value == conflict_opt.at_value) {
-			conflict(opt->name, (char **)opt->subopts,
-				 conflict_opt.subopt, index);
+			print_conflict_struct(opt, sp, &conflict_opt);
 		}
 	}
 }
@@ -3589,6 +3592,30 @@ conflict(
 {
 	fprintf(stderr, _("Cannot specify both -%c %s and -%c %s\n"),
 		opt, tab[oldidx], opt, tab[newidx]);
+	usage();
+}
+
+
+/*
+ * Print everything related to a conflict for the user
+ * and show up the usage. That will terminate the program.
+ */
+static void
+print_conflict_struct(
+	struct opt_params	*opt,
+	struct subopt_param	*subopt,
+	struct subopt_conflict	*conflict)
+{
+	fprintf(stderr, _("Cannot specify both -%c %s and -%c %s"),
+		opt->name,
+		opt->subopts[subopt->index],
+		opts[conflict->opt].name,
+		opts[conflict->opt].subopts[conflict->subopt]);
+	if(conflict->message) {
+		fprintf(stderr, ": %s",
+			_(conflict->message));
+	}
+	fprintf(stderr, "\n");
 	usage();
 }
 
