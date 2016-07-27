@@ -1654,18 +1654,18 @@ illegal_option(
  */
 static void
 check_opt(
-	struct opt_params	*opts,
+	struct opt_params	*opt,
 	int			index,
 	bool			str_seen)
 {
-	struct subopt_param	*sp = &opts->subopt_params[index];
+	struct subopt_param	*sp = &opt->subopt_params[index];
 	int			i;
 
 	if (sp->index != index) {
 		fprintf(stderr,
 	("Developer screwed up option parsing (%d/%d)! Please report!\n"),
 			sp->index, index);
-		reqval(opts->name, (char **)opts->subopts, index);
+		reqval(opt->name, (char **)opt->subopts, index);
 	}
 
 	/*
@@ -1678,11 +1678,11 @@ check_opt(
 	 */
 	if (!str_seen) {
 		if (sp->seen)
-			respec(opts->name, (char **)opts->subopts, index);
+			respec(opt->name, (char **)opt->subopts, index);
 		sp->seen = true;
 	} else {
 		if (sp->str_seen)
-			respec(opts->name, (char **)opts->subopts, index);
+			respec(opt->name, (char **)opt->subopts, index);
 		sp->str_seen = true;
 	}
 
@@ -1692,10 +1692,44 @@ check_opt(
 
 		if (conflict_opt.opt == LAST_CONFLICT)
 			break;
-		if (opts->subopt_params[conflict_opt.subopt].seen ||
-		    opts->subopt_params[conflict_opt.subopt].str_seen)
-			conflict(opts->name, (char **)opts->subopts,
+		if (conflict_opt.test_values)
+			break;
+		if (opt->subopt_params[conflict_opt.subopt].seen ||
+		    opt->subopt_params[conflict_opt.subopt].str_seen) {
+			conflict(opt->name, (char **)opt->subopts,
 				 conflict_opt.subopt, index);
+		}
+	}
+}
+
+/*
+ * Check for conflict values between options.
+ */
+static void
+check_opt_value(
+	struct opt_params	*opt,
+	int			index,
+	long long 		value)
+{
+	struct subopt_param	*sp = &opt->subopt_params[index];
+	int			i;
+
+	/* check for conflicts with the option */
+	for (i = 0; i < MAX_CONFLICTS; i++) {
+		struct subopt_conflict conflict_opt = sp->conflicts[i];
+
+		if (conflict_opt.opt == LAST_CONFLICT)
+			break;
+		if (!conflict_opt.test_values)
+			break;
+		if ((opt->subopt_params[conflict_opt.subopt].seen ||
+				    opt->subopt_params[conflict_opt.subopt].str_seen) &&
+		    opt->subopt_params[conflict_opt.subopt].value
+				== conflict_opt.invalid_value &&
+		    value == conflict_opt.at_value) {
+			conflict(opt->name, (char **)opt->subopts,
+				 conflict_opt.subopt, index);
+		}
 	}
 }
 
@@ -1760,6 +1794,8 @@ getnum(
 		if (*str_end != '\0')
 			illegal_option(str, opts, index, NULL);
 	}
+
+	check_opt_value(opts, index, c);
 
 	/* Validity check the result. */
 	if (c < sp->minval)
