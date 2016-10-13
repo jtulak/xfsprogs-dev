@@ -1861,7 +1861,7 @@ illegal_option(
  * Check for conflicts and option respecification.
  */
 static void
-check_opt(
+check_subopt_conflicts(
 	struct opt_params	*opt,
 	int			index,
 	bool			str_seen)
@@ -1913,7 +1913,7 @@ check_opt(
  * Check for conflict values between options.
  */
 static void
-check_opt_value(
+check_subopt_value(
 	struct opt_params	*opt,
 	int			index,
 	long long 		value)
@@ -1939,6 +1939,32 @@ check_opt_value(
 	}
 }
 
+/**
+ * Go through entire opt_params table and check every option for valid values
+ * and for conflicts.
+ */
+static void
+check_opt(
+	struct opt_params *opts,
+	int opti)
+{
+	int index;
+	struct opt_params *opt = &opts[opti];
+	for (index = 0; index < MAX_SUBOPTS; index++) {
+		struct subopt_param *sp = &opt->subopt_params[index];
+		check_subopt_conflicts(opt, index, false);
+		check_subopt_value(opt, index, sp->value);
+	}
+}
+static void
+check_all_opts(struct opt_params *opts)
+{
+	int opti;
+	for (opti = 0; opti < MAX_OPTS; opti++) {
+		check_opt(opts, opti);
+	}
+}
+
 static uint64_t
 getnum(
 	const char		*str,
@@ -1949,8 +1975,8 @@ getnum(
 	uint64_t		c;
 	int			ret;
 
-	check_opt(opts, index, false);
 	set_conf_raw(opts->index, index, str);
+
 	/* empty strings might just return a default value */
 	if (!str || *str == '\0') {
 		if (sp->flagval == SUBOPT_NEEDS_VAL)
@@ -2001,8 +2027,6 @@ getnum(
 			illegal_option(str, opts, index, NULL);
 	}
 
-	check_opt_value(opts, index, c);
-
 	/* Validity check the result. */
 	if (c < sp->minval)
 		illegal_option(str, opts, index, _("value is too small"));
@@ -2025,7 +2049,7 @@ getstr(
 	struct opt_params	*opts,
 	int			index)
 {
-	check_opt(opts, index, true);
+	check_subopt_conflicts(opts, index, true);
 
 	/* empty strings for string options are not valid */
 	if (!str || *str == '\0')
@@ -2667,6 +2691,8 @@ main(
 					&opts[OPT_D], D_NAME);
 	} else
 		dfile = xi.dname;
+
+	check_all_opts(opts);
 
 	/*
 	 * Blocksize and D_SECTSIZE first, other things depend on them
