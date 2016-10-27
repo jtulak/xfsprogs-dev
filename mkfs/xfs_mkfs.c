@@ -173,6 +173,8 @@ static int  ispow2(unsigned int i);
  *     on the CLI, no matter its value. The field .message contains an optional
  *     explanatory string for the user. This string can't be translated here,
  *     so it has to be enveloped with _() when printed.
+ *     The .test_default_value is used when .test_values is true, and extends
+ *     the check also for default values.
  *     The last member of this list has to be {LAST_CONFLICT}.
  *
  *   minval, maxval OPTIONAL
@@ -230,6 +232,7 @@ struct opt_params {
 			int		opt;
 			int		subopt;
 			bool		test_values;
+			bool		test_default_value;
 			uint64_t	invalid_value;
 			uint64_t	at_value;
 			const char	*message;
@@ -546,6 +549,7 @@ struct opt_params {
 				{.opt = OPT_M,
 				 .subopt = M_CRC,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 1,
 				 .at_value = 0,
 				 .message =
@@ -625,6 +629,7 @@ struct opt_params {
 				{.opt = OPT_M,
 				 .subopt = M_CRC,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 1,
 				 .at_value = 1,
 				 .message =
@@ -639,6 +644,7 @@ struct opt_params {
 				{.opt = OPT_M,
 				 .subopt = M_CRC,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 1,
 				 .at_value = 0,
 				 .message =
@@ -741,6 +747,7 @@ struct opt_params {
 				{.opt = OPT_M,
 				 .subopt = M_CRC,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 1,
 				 .at_value = 1,
 				 .message =
@@ -857,6 +864,7 @@ struct opt_params {
 				{.opt = OPT_M,
 				 .subopt = M_CRC,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 1,
 				 .at_value = 0,
 				 .message =
@@ -917,6 +925,7 @@ struct opt_params {
 			  .conflicts = {  {.opt = OPT_M,
 				 .subopt = M_CRC,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 1,
 				 .at_value = 0,
 				 .message =
@@ -1103,6 +1112,7 @@ struct opt_params {
 				{.opt = OPT_L,
 				 .subopt = L_VERSION,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 1,
 				 .at_value = 1,
 				 .message =
@@ -1110,6 +1120,7 @@ struct opt_params {
 				{.opt = OPT_I,
 				 .subopt = I_ALIGN,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 0,
 				 .at_value = 1,
 				 .message =
@@ -1117,6 +1128,7 @@ struct opt_params {
 				{.opt = OPT_I,
 				 .subopt = I_PROJID32BIT,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 0,
 				 .at_value = 1,
 				 .message =
@@ -1124,6 +1136,7 @@ struct opt_params {
 			{.opt = OPT_I,
 				 .subopt = I_ATTR,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 1,
 				 .at_value = 1,
 				 .message =
@@ -1131,6 +1144,7 @@ struct opt_params {
 			{.opt = OPT_L,
 				 .subopt = L_LAZYSBCNTR,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 0,
 				 .at_value = 1,
 				 .message =
@@ -1145,6 +1159,7 @@ struct opt_params {
 				{.opt = OPT_M,
 				 .subopt = M_RMAPBT,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 1,
 				 .at_value = 0,
 				 .message =
@@ -1152,6 +1167,7 @@ struct opt_params {
 				{.opt = OPT_M,
 				 .subopt = M_REFLINK,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 1,
 				 .at_value = 0,
 				 .message =
@@ -1166,6 +1182,7 @@ struct opt_params {
 				{.opt = OPT_N,
 				 .subopt = N_FTYPE,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 0,
 				 .at_value = 1,
 				 .message =
@@ -1198,6 +1215,7 @@ struct opt_params {
 				{.opt = OPT_M,
 				 .subopt = M_CRC,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 0,
 				 .at_value = 1,
 				 .message =
@@ -1226,6 +1244,7 @@ struct opt_params {
 				{.opt = OPT_M,
 				 .subopt = M_CRC,
 				 .test_values = true,
+				 .test_default_value = true,
 				 .invalid_value = 0,
 				 .at_value = 1,
 				 .message =
@@ -1906,7 +1925,8 @@ check_subopt_value(
 			break;
 		if (!conflict_opt.test_values)
 			break;
-		if (opts[conflict_opt.opt].subopt_params[conflict_opt.subopt].seen &&
+		if ( (opts[conflict_opt.opt].subopt_params[conflict_opt.subopt].seen ||
+		      conflict_opt.test_default_value) &&
 		    opts[conflict_opt.opt].subopt_params[conflict_opt.subopt].value
 				== conflict_opt.invalid_value &&
 		    value == conflict_opt.at_value) {
