@@ -37,7 +37,6 @@ static int  ispow2(unsigned int i);
 
 #define MAX_OPTS	16
 #define MAX_SUBOPTS	16
-#define SUBOPT_NEEDS_VAL	(-1LL)
 #define MAX_CONFLICTS	32
 #define LAST_CONFLICT	(-1)
 
@@ -194,8 +193,6 @@ static int  ispow2(unsigned int i);
  *     The value used if user specifies the subopt, but no value.
  *     If the subopt accepts some values (-d file=[1|0]), then this
  *     sets what is used with simple specifying the subopt (-d file).
- *     A special SUBOPT_NEEDS_VAL can be used to require a user-given
- *     value in any case.
  *
  *   raw_input INTERNAL
  *     Filled raw string from the user, so we never lose that information e.g.
@@ -210,6 +207,11 @@ static int  ispow2(unsigned int i);
  *     (If the field is a string and not a number, this value is set to
  *     a positive non-zero number on an user input.)
  *
+ *   needs_val OPTIONAL
+ *     Set to true if, when user specifies the option, she has to specify
+ *     a value too. That is, if needs_val is true, then it is not possible to
+ *     use the subopt as a flag.
+ *
  * !!! NOTE ==================================================================
  *
  * If you are adding a new option, or changing an existing one,
@@ -217,6 +219,7 @@ static int  ispow2(unsigned int i);
  * with expected behaviour (simple fail/pass).
  *
  * !!! END OF NOTE ===========================================================
+ *
  */
 struct opt_params {
 	int		index;
@@ -242,6 +245,7 @@ struct opt_params {
 		uint64_t	flagval;
 		const char	*raw_input;
 		uint64_t	value;
+		bool		needs_val;
 	}		subopt_params[MAX_SUBOPTS];
 } opts[MAX_OPTS] = {
 	{
@@ -264,7 +268,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = XFS_MIN_BLOCKSIZE_LOG,
 			  .maxval = XFS_MAX_BLOCKSIZE_LOG,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = B_SIZE,
 			  .convert = true,
@@ -279,7 +283,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = XFS_MIN_BLOCKSIZE,
 			  .maxval = XFS_MAX_BLOCKSIZE,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 		},
 	},
@@ -316,7 +320,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = 1,
 			  .maxval = XFS_MAX_AGNUMBER,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = D_FILE,
 			  .conflicts = { {LAST_CONFLICT} },
@@ -326,14 +330,14 @@ struct opt_params {
 			},
 			{ .index = D_NAME,
 			  .conflicts = { {LAST_CONFLICT} },
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = D_SIZE,
 			  .conflicts = { {LAST_CONFLICT} },
 			  .convert = true,
 			  .minval = XFS_AG_MIN_BYTES,
 			  .maxval = LLONG_MAX,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = D_SUNIT,
 			  .conflicts = {
@@ -358,7 +362,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = UINT_MAX,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = D_SWIDTH,
 			  .conflicts = {
@@ -383,7 +387,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = UINT_MAX,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = D_AGSIZE,
 			  .conflicts = {
@@ -397,7 +401,7 @@ struct opt_params {
 			  .convert = true,
 			  .minval = XFS_AG_MIN_BYTES,
 			  .maxval = XFS_AG_MAX_BYTES,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = D_SU,
 			  .conflicts = {
@@ -423,7 +427,7 @@ struct opt_params {
 			  .convert = true,
 			  .minval = 0,
 			  .maxval = UINT_MAX,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = D_SW,
 			  .conflicts = {
@@ -448,7 +452,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = UINT_MAX,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = D_SECTLOG,
 			  .conflicts = {
@@ -461,7 +465,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = XFS_MIN_SECTORSIZE_LOG,
 			  .maxval = XFS_MAX_SECTORSIZE_LOG,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = D_SECTSIZE,
 			  .conflicts = {
@@ -476,7 +480,7 @@ struct opt_params {
 			  .is_power_2 = true,
 			  .minval = XFS_MIN_SECTORSIZE,
 			  .maxval = XFS_MAX_SECTORSIZE,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = D_NOALIGN,
 			  .conflicts = {
@@ -519,13 +523,13 @@ struct opt_params {
 			  .conflicts = { {LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = UINT_MAX,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = D_EXTSZINHERIT,
 			  .conflicts = { {LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = UINT_MAX,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 		},
 	},
@@ -576,13 +580,13 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = XFS_DINODE_MIN_LOG,
 			  .maxval = XFS_DINODE_MAX_LOG,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = I_MAXPCT,
 			  .conflicts = { {LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = 100,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = I_PERBLOCK,
 			  .conflicts = {
@@ -602,7 +606,7 @@ struct opt_params {
 			  .is_power_2 = true,
 			  .minval = XFS_MIN_INODE_PERBLOCK,
 			  .maxval = XFS_MAX_BLOCKSIZE / XFS_DINODE_MIN_SIZE,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = I_SIZE,
 			  .conflicts = {
@@ -622,7 +626,7 @@ struct opt_params {
 			  .is_power_2 = true,
 			  .minval = XFS_DINODE_MIN_SIZE,
 			  .maxval = XFS_DINODE_MAX_SIZE,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = I_ATTR,
 			  .conflicts = {
@@ -637,7 +641,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = 2,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = I_PROJID32BIT,
 			  .conflicts = {
@@ -707,7 +711,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = UINT_MAX,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = L_INTERNAL,
 			  .conflicts = {
@@ -740,7 +744,7 @@ struct opt_params {
 			  .convert = true,
 			  .minval = 2 * 1024 * 1024LL,	/* XXX: XFS_MIN_LOG_BYTES */
 			  .maxval = XFS_MAX_LOG_BYTES,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = L_VERSION,
 			  .conflicts = {
@@ -755,7 +759,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = 1,
 			  .maxval = 2,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = L_SUNIT,
 			  .conflicts = {
@@ -768,7 +772,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = 1,
 			  .maxval = BTOBB(XLOG_MAX_RECORD_BSIZE),
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = L_SU,
 			  .conflicts = {
@@ -782,7 +786,7 @@ struct opt_params {
 			  .convert = true,
 			  .minval = BBTOB(1),
 			  .maxval = XLOG_MAX_RECORD_BSIZE,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = L_DEV,
 			  .conflicts = {
@@ -799,7 +803,7 @@ struct opt_params {
 				 .at_value = 0,
 				},
 				{LAST_CONFLICT} },
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = L_SECTLOG,
 			  .conflicts = {
@@ -812,7 +816,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = XFS_MIN_SECTORSIZE_LOG,
 			  .maxval = XFS_MAX_SECTORSIZE_LOG,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = L_SECTSIZE,
 			  .conflicts = {
@@ -827,7 +831,7 @@ struct opt_params {
 			  .is_power_2 = true,
 			  .minval = XFS_MIN_SECTORSIZE,
 			  .maxval = XFS_MAX_SECTORSIZE,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = L_FILE,
 			  .conflicts = {
@@ -857,7 +861,7 @@ struct opt_params {
 				 .at_value = 0,
 				},
 				{LAST_CONFLICT} },
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = L_LAZYSBCNTR,
 			  .conflicts = {
@@ -898,7 +902,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = XFS_MIN_REC_DIRSIZE,
 			  .maxval = XFS_MAX_BLOCKSIZE_LOG,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = N_SIZE,
 			  .conflicts = {
@@ -913,13 +917,13 @@ struct opt_params {
 			  .is_power_2 = true,
 			  .minval = 1 << XFS_MIN_REC_DIRSIZE,
 			  .maxval = XFS_MAX_BLOCKSIZE,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = N_VERSION,
 			  .conflicts = { {LAST_CONFLICT} },
 			  .minval = 2,
 			  .maxval = 2,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = N_FTYPE,
 			  .conflicts = {  {.opt = OPT_M,
@@ -955,14 +959,14 @@ struct opt_params {
 			  .convert = true,
 			  .minval = XFS_MIN_RTEXTSIZE,
 			  .maxval = XFS_MAX_RTEXTSIZE,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = R_SIZE,
 			  .conflicts = { {LAST_CONFLICT} },
 			  .convert = true,
 			  .minval = 0,
 			  .maxval = LLONG_MAX,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = R_DEV,
 			  .conflicts = {
@@ -974,7 +978,7 @@ struct opt_params {
 				 .message =
 		N_("rmapbt not supported without CRC support.")},
 				{LAST_CONFLICT} },
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = R_FILE,
 			  .minval = 0,
@@ -992,7 +996,7 @@ struct opt_params {
 				 .message =
 		N_("rmapbt not supported without CRC support.")},
 				{LAST_CONFLICT} },
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = R_NOALIGN,
 			  .minval = 0,
@@ -1030,7 +1034,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = XFS_MIN_SECTORSIZE_LOG,
 			  .maxval = XFS_MAX_SECTORSIZE_LOG,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = S_SECTLOG,
 			  .conflicts = {
@@ -1049,7 +1053,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = XFS_MIN_SECTORSIZE_LOG,
 			  .maxval = XFS_MAX_SECTORSIZE_LOG,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = S_SIZE,
 			  .conflicts = {
@@ -1070,7 +1074,7 @@ struct opt_params {
 			  .is_power_2 = true,
 			  .minval = XFS_MIN_SECTORSIZE,
 			  .maxval = XFS_MAX_SECTORSIZE,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = S_SECTSIZE,
 			  .conflicts = {
@@ -1091,7 +1095,7 @@ struct opt_params {
 			  .is_power_2 = true,
 			  .minval = XFS_MIN_SECTORSIZE,
 			  .maxval = XFS_MAX_SECTORSIZE,
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 		},
 	},
@@ -1208,7 +1212,7 @@ struct opt_params {
 			},
 			{ .index = M_UUID,
 			  .conflicts = { {LAST_CONFLICT} },
-			  .flagval = SUBOPT_NEEDS_VAL,
+			  .needs_val = true,
 			},
 			{ .index = M_RMAPBT,
 			.conflicts = {
@@ -1252,7 +1256,7 @@ struct opt_params {
 				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = 1,
-			  .flagval = 0,
+			  .needs_val = true,
 			},
 		},
 	},
@@ -1979,7 +1983,7 @@ getnum(
 
 	/* empty strings might just return a default value */
 	if (!str || *str == '\0') {
-		if (sp->flagval == SUBOPT_NEEDS_VAL)
+		if (sp->needs_val)
 			reqval(opts->name, (char **)opts->subopts, index);
 		sp->seen = true;
 		return sp->flagval;
