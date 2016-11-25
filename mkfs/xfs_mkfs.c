@@ -2046,6 +2046,33 @@ getnum(
 		}
 	}
 
+	/* Prevent things like specifying blocksize as a number of blocks. */
+	if (opts->index == OPT_B ||
+		(opts->index == OPT_N && (index == N_SIZE))
+		) {
+		if ('b' == str[strlen(str)-1]) {
+			fprintf(stderr,
+				_("You can't set a block size in "
+				  "number of blocks (-%c %s).\n"),
+				opts->name, opts->subopts[index]);
+			exit(1);
+		}
+	}
+	else if (opts->index == OPT_S ||
+		(opts->index == OPT_L && (index == L_SECTLOG ||
+			index == L_SECTSIZE)) ||
+		(opts->index == OPT_D && (index == D_SECTLOG ||
+			index == D_SECTSIZE))
+		) {
+		if ('s' == str[strlen(str)-1]) {
+			fprintf(stderr,
+				_("You can't set a sector size in "
+				  "number of sectors (-%c %s).\n"),
+				opts->name, opts->subopts[index]);
+			exit(1);
+		}
+	}
+
 	sp->seen = true;
 
 	if (test_uvalue_num(sp->type, sp->minval, 0) &&
