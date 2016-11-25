@@ -664,10 +664,10 @@ struct opt_params {
 			},
 			{ .index = D_RTINHERIT,
 			  .conflicts = { {LAST_CONFLICT} },
-			  .minval.u = 1,
-			  .maxval.u = 1,
-			  .flagval.u = 1,
-			  .type = UINT,
+			  .minval.b = false,
+			  .maxval.b = true,
+			  .flagval.b = true,
+			  .type = BOOL,
 			},
 			{ .index = D_PROJINHERIT,
 			  .conflicts = { {LAST_CONFLICT} },
@@ -804,10 +804,10 @@ struct opt_params {
 					  .message = \
 		"Sparse inodes not supported without CRC support."},
 					 {LAST_CONFLICT} },
-			  .minval.i = 0,
-			  .maxval.i = 1,
-			  .flagval.i = 1,
-			  .type = INT,
+			  .minval.b = false,
+			  .maxval.b = true,
+			  .flagval.b = true,
+			  .type = BOOL,
 			},
 		},
 	},
@@ -936,10 +936,10 @@ struct opt_params {
 					  .subopt = L_INTERNAL,
 					 },
 					 {LAST_CONFLICT} },
-			  .minval.i = 0,
-			  .maxval.i = 1,
-			  .flagval.i = 1,
-			  .type = INT,
+			  .minval.b = false,
+			  .maxval.b = true,
+			  .flagval.b = true,
+			  .type = BOOL,
 			},
 			{ .index = L_NAME,
 			  .conflicts = { {.opt = OPT_L,
@@ -1069,10 +1069,10 @@ struct opt_params {
 			  .type = STRING,
 			},
 			{ .index = R_FILE,
-			  .minval.i = 0,
-			  .maxval.i = 1,
-			  .flagval.i = 1,
-			  .type = INT,
+			  .minval.b = false,
+			  .maxval.b = true,
+			  .flagval.b = true,
+			  .type = BOOL,
 			  .conflicts = { {LAST_CONFLICT} },
 			},
 			{ .index = R_NAME,
@@ -1089,10 +1089,10 @@ struct opt_params {
 			  .type = STRING,
 			},
 			{ .index = R_NOALIGN,
-			  .minval.i = 0,
-			  .maxval.i = 1,
-			  .flagval.i = 1,
-			  .type = INT,
+			  .minval.b = false,
+			  .maxval.b = true,
+			  .flagval.b = true,
+			  .type = BOOL,
 			  .conflicts = { {LAST_CONFLICT} },
 			},
 		},
@@ -2204,7 +2204,7 @@ main(
 	xfs_extlen_t		nbmblocks;
 	int			nlflag;
 	int			*nodsflag;
-	int			*norsflag;
+	bool			*norsflag;
 	xfs_alloc_rec_t		*nrec;
 	int			nsflag;
 	int			nvflag;
@@ -2267,7 +2267,7 @@ main(
 	dsu = &opts[OPT_D].subopt_params[D_SU].value.i;
 	dsw = &opts[OPT_D].subopt_params[D_SW].value.i;
 	nodsflag = &opts[OPT_D].subopt_params[D_NOALIGN].value.i;
-	norsflag = &opts[OPT_R].subopt_params[R_NOALIGN].value.i;
+	norsflag = &opts[OPT_R].subopt_params[R_NOALIGN].value.b;
 	logagno = &opts[OPT_L].subopt_params[L_AGNUM].value.u;
 	lsu = &opts[OPT_L].subopt_params[L_SU].value.i;
 	lsunit = &opts[OPT_L].subopt_params[L_SUNIT].value.i;
@@ -2402,7 +2402,7 @@ main(
 					if (c)
 						fsx.fsx_xflags |=
 							XFS_DIFLAG_RTINHERIT;
-					opts[OPT_D].subopt_params[D_RTINHERIT].value.u = c;
+					opts[OPT_D].subopt_params[D_RTINHERIT].value.b = c;
 					break;
 				case D_PROJINHERIT:
 					fsx.fsx_projid = getnum(value, &opts[OPT_D],
@@ -2738,15 +2738,15 @@ main(
 	opts[OPT_D].subopt_params[D_FILE].value.i  = xi.disfile;
 	opts[OPT_D].subopt_params[D_PROJINHERIT].value.u = fsx.fsx_projid;
 	opts[OPT_D].subopt_params[D_EXTSZINHERIT].value.u = fsx.fsx_extsize;
-	opts[OPT_L].subopt_params[L_FILE].value.i = xi.lisfile;
+	opts[OPT_L].subopt_params[L_FILE].value.b = xi.lisfile;
 	opts[OPT_L].subopt_params[L_VERSION].value.i = sb_feat.log_version;
 	opts[OPT_L].subopt_params[L_LAZYSBCNTR].value.b = sb_feat.lazy_sb_counters;
 	opts[OPT_I].subopt_params[I_ATTR].value.i = sb_feat.attr_version ;
 	opts[OPT_I].subopt_params[I_PROJID32BIT].value.b = !sb_feat.projid16bit ;
-	opts[OPT_I].subopt_params[I_SPINODES].value.i = sb_feat.spinodes ;
+	opts[OPT_I].subopt_params[I_SPINODES].value.b = sb_feat.spinodes ;
 	opts[OPT_M].subopt_params[M_FINOBT].value.i = sb_feat.finobt ;
 	opts[OPT_M].subopt_params[M_RMAPBT].value.b = sb_feat.rmapbt ;
-	opts[OPT_R].subopt_params[R_FILE].value.i = xi.risfile ;
+	opts[OPT_R].subopt_params[R_FILE].value.b = xi.risfile ;
 	opts[OPT_R].subopt_params[R_NAME].value.s = xi.rtname;
 	opts[OPT_R].subopt_params[R_DEV].value.s = xi.rtname;
 	opts[OPT_S].subopt_params[S_LOG].value.u = sectorsize;
