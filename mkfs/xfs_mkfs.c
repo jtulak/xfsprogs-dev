@@ -2571,11 +2571,10 @@ main(
 						value, &opts[OPT_M], M_FINOBT);
 					break;
 				case M_UUID:
-					if (!value || *value == '\0')
-						reqval('m', subopts, M_UUID);
+					opts[OPT_M].subopt_params[M_UUID].value.s =
+						getstr(value, &opts[OPT_M], M_UUID);
 					if (platform_uuid_parse(value, &uuid))
 						illegal(optarg, "m uuid");
-					opts[OPT_M].subopt_params[M_UUID].value.s = value;
 					break;
 				case M_RMAPBT:
 					sb_feat.rmapbt = getnum(
