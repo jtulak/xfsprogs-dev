@@ -432,6 +432,10 @@ test_uvalue_num(enum e_type a_type, union u_value a, long long b) {
  *     Set to true if, when user specifies the option, she has to specify
  *     a value too. That is, if needs_val is true, then it is not possible to
  *     use the subopt as a flag.
+ *
+ *   can_respec OPTIONAL
+ *     If true, then there can come one getnum() after a getstr() call for this
+ *     option.
  */
 struct opt_params {
 	int		index;
@@ -458,6 +462,7 @@ struct opt_params {
 		union u_value value;
 		enum e_type 	type;
 		bool		needs_val;
+		bool		can_respec;
 	}		subopt_params[MAX_SUBOPTS];
 } opts[MAX_OPTS] = {
 	{
@@ -876,6 +881,7 @@ struct opt_params {
 			  .maxval.i = 2,
 			  .needs_val = true,
 			  .type = INT,
+			  .can_respec = true,
 			},
 			{ .index = L_SUNIT,
 			  .conflicts = { {.opt = OPT_L,
@@ -1008,6 +1014,7 @@ struct opt_params {
 			  .maxval.i = 2,
 			  .needs_val = true,
 			  .type = INT,
+			  .can_respec = true,
 			},
 			{ .index = N_FTYPE,
 			  .conflicts = {  {.opt = OPT_M,
@@ -2022,6 +2029,22 @@ getnum(
 	struct subopt_param	*sp = &opts->subopt_params[index];
 	long long		c;
 
+	if (sp->seen){
+		/* If the option has respec flag, it is possible to do ONE
+		 * getnum call even with sp->seen == 1. Do this by disabling
+		 * the respec flag - this time we can continue, but if getnum
+		 * gets called once more, we will fail.
+		 */
+		if (sp->can_respec){
+			sp->can_respec = false;
+		} else {
+			fprintf(stderr,
+			_("You can't use an option multiple times: -%c %s\n"),
+			  opts->name, opts->subopts[index]);
+			usage();
+		}
+	}
+
 	/* empty strings might just return a default value */
 	if (!str || *str == '\0') {
 		if (sp->needs_val)
@@ -2134,6 +2157,12 @@ getstr(
 	/* empty strings for string options are not valid */
 	if (!str || *str == '\0')
 		reqval(opts->name, (char **)opts->subopts, index);
+	if (opts->subopt_params[index].seen){
+		fprintf(stderr,
+		_("You can't use an option multiple times: -%c %s\n"),
+		  opts->name, opts->subopts[index]);
+		usage();
+	}
 	opts->subopt_params[index].seen = true;
 	return str;
 }
