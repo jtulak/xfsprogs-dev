@@ -2771,26 +2771,6 @@ main(
 		*blocklog = XFS_DFL_BLOCKSIZE_LOG;
 		*blocksize = 1 << XFS_DFL_BLOCKSIZE_LOG;
 	}
-	if (*blocksize < XFS_MIN_BLOCKSIZE || *blocksize > XFS_MAX_BLOCKSIZE) {
-		fprintf(stderr, _("illegal block size %d\n"), *blocksize);
-		usage();
-	}
-	if (sb_feat.crcs_enabled && *blocksize < XFS_MIN_CRC_BLOCKSIZE) {
-		fprintf(stderr,
-_("Minimum block size for CRC enabled filesystems is %d bytes.\n"),
-			XFS_MIN_CRC_BLOCKSIZE);
-		usage();
-	}
-
-	/*
-	 * If user explicitly stated -m crc=1 -n ftype=0, an error was already
-	 * issued. But if -n ftype=0 was stated alone, then it is a conflict
-	 * with a default value for crc enabled and has to be detected here.
-	 */
-	if (sb_feat.crcs_enabled && !sb_feat.dirftype) {
-		fprintf(stderr, _("cannot disable ftype with crcs enabled\n"));
-		usage();
-	}
 	if (!slflag && !ssflag) {
 		sectorlog = XFS_MIN_SECTORSIZE_LOG;
 		sectorsize = XFS_MIN_SECTORSIZE;
