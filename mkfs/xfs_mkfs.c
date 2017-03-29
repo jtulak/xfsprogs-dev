@@ -1378,6 +1378,83 @@ static void print_conflict_struct(
 #define WHACK_SIZE (128 * 1024)
 
 /*
+ * Find the opposite conflict.
+ */
+static struct subopt_conflict *
+find_opposite_conflict(
+	struct opt_params *opts,
+	int opt,
+	int subopt,
+	struct subopt_conflict *conflict)
+{
+	/* Get the conflicts of the opposite subopt and run through them. */
+	struct subopt_conflict *conflicts = opts[conflict->opt]\
+		.subopt_params[conflict->subopt]\
+		.conflicts;
+
+	for (int i=0; i < MAX_CONFLICTS; i++) {
+		if (conflicts[i].opt == LAST_CONFLICT)
+			break;
+		if (conflicts[i].opt != opt || conflicts[i].subopt != subopt)
+			continue;
+
+		/* we found the corresponding conflict, return it */
+		return &conflicts[i];
+	}
+
+	fprintf(stderr, _("This is a bug: -%c %s has a conflict pointing at -%c %s, but the other way is missing.\n"),
+		opts[opt].name, opts[opt].subopts[subopt],
+		opts[conflict->opt].name, opts[conflict->opt].subopts[conflict->subopt]);
+	exit(1);
+}
+
+
+/*
+ * Compare two conflicts, if they have corresponding values.
+ */
+static bool
+conflicts_corresponds(
+	struct subopt_conflict * conflict,
+	struct subopt_conflict * opposite)
+{
+	return true;
+}
+
+/*
+ * Validate options table.
+ * Try to find out if there are mismatches in conflicts.
+ */
+static void
+validate_opts(struct opt_params *opts)
+{
+	struct subopt_conflict * conflict;
+	struct subopt_conflict * opposite;
+
+	for (int o=0; o < MAX_OPTS; o++) {
+		if (opts[o].index != o)
+			break;
+
+		for (int s=0; s < MAX_SUBOPTS; s++) {
+			if (opts[o].subopt_params[s].index != s)
+				break;
+
+			for (int c=0; c < MAX_CONFLICTS; c++) {
+				if (opts[o].subopt_params[s].conflicts[c].opt == LAST_CONFLICT)
+					break;
+
+				conflict = &opts[o].subopt_params[s].conflicts[c];
+				opposite = find_opposite_conflict(opts, o, s, conflict);
+				if (! conflicts_corresponds(conflict, opposite)) {
+					fprintf(stderr,
+						_("FOOO!"));
+					exit(1);
+				}
+			}
+		}
+	}
+}
+
+/*
  * Convert lsu to lsunit for 512 bytes blocks and check validity of the values.
  */
 static void
@@ -2287,6 +2364,8 @@ main(
 	setlocale(LC_ALL, "");
 	bindtextdomain(PACKAGE, LOCALEDIR);
 	textdomain(PACKAGE);
+
+	validate_opts(opts);
 
 
 	/*
