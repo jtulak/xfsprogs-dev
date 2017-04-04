@@ -38,7 +38,7 @@ static int  ispow2(unsigned int i);
 #define MAX_OPTS	16
 #define MAX_SUBOPTS	16
 #define SUBOPT_NEEDS_VAL	(-1LL)
-#define MAX_CONFLICTS	8
+#define MAX_CONFLICTS	32
 #define LAST_CONFLICT	(-1)
 
 #define OPT_B		0
@@ -547,7 +547,15 @@ struct opt_params {
 		},
 		.subopt_params = {
 			{ .index = I_ALIGN,
-			  .conflicts = { {LAST_CONFLICT} },
+			  .conflicts = {
+				{.opt = OPT_M,
+				 .subopt = M_CRC,
+				 .test_values = true,
+				 .invalid_value = 1,
+				 .at_value = 0,
+				 .message =
+		N_("Inodes always aligned for CRC enabled filesytems.")},
+				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = 1,
 			  .flagval = 1,
@@ -618,19 +626,44 @@ struct opt_params {
 			  .flagval = SUBOPT_NEEDS_VAL,
 			},
 			{ .index = I_ATTR,
-			  .conflicts = { {LAST_CONFLICT} },
+			  .conflicts = {
+				{.opt = OPT_M,
+				 .subopt = M_CRC,
+				 .test_values = true,
+				 .invalid_value = 1,
+				 .at_value = 1,
+				 .message =
+		N_("V2 attribute format always enabled on CRC enabled filesytems.")},
+				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = 2,
 			  .flagval = SUBOPT_NEEDS_VAL,
 			},
 			{ .index = I_PROJID32BIT,
-			  .conflicts = { {LAST_CONFLICT} },
+			  .conflicts = {
+				{.opt = OPT_M,
+				 .subopt = M_CRC,
+				 .test_values = true,
+				 .invalid_value = 1,
+				 .at_value = 0,
+				 .message =
+		N_("32 bit Project IDs always enabled on CRC enabled filesytems.")},
+				{LAST_CONFLICT} },
+
 			  .minval = 0,
 			  .maxval = 1,
 			  .flagval = 1,
 			},
 			{ .index = I_SPINODES,
-			  .conflicts = { {LAST_CONFLICT} },
+			  .conflicts = {
+				{.opt = OPT_M,
+				 .subopt = M_CRC,
+				 .test_values = true,
+				 .invalid_value = 0,
+				 .at_value = 1,
+				 .message =
+		N_("Sparse inodes not supported without CRC support.")},
+				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = 1,
 			  .flagval = 1,
@@ -664,6 +697,12 @@ struct opt_params {
 				 .invalid_value = 0,
 				 .at_value = 0,
 				},
+				{.opt = OPT_L,
+				 .subopt = L_NAME,
+				 .test_values = false,
+				 .invalid_value = 0,
+				 .at_value = 0,
+				},
 				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = UINT_MAX,
@@ -683,6 +722,12 @@ struct opt_params {
 				 .invalid_value = 0,
 				 .at_value = 0,
 				},
+				{.opt = OPT_L,
+				 .subopt = L_NAME,
+				 .test_values = false,
+				 .invalid_value = 0,
+				 .at_value = 0,
+				},
 				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = 1,
@@ -697,7 +742,15 @@ struct opt_params {
 			  .flagval = SUBOPT_NEEDS_VAL,
 			},
 			{ .index = L_VERSION,
-			  .conflicts = { {LAST_CONFLICT} },
+			  .conflicts = {
+				{.opt = OPT_M,
+				 .subopt = M_CRC,
+				 .test_values = true,
+				 .invalid_value = 1,
+				 .at_value = 1,
+				 .message =
+		N_("V2 logs are required for CRC enabled filesystems.")},
+				{LAST_CONFLICT} },
 			  .minval = 1,
 			  .maxval = 2,
 			  .flagval = SUBOPT_NEEDS_VAL,
@@ -805,7 +858,15 @@ struct opt_params {
 			  .flagval = SUBOPT_NEEDS_VAL,
 			},
 			{ .index = L_LAZYSBCNTR,
-			  .conflicts = { {LAST_CONFLICT} },
+			  .conflicts = {
+				{.opt = OPT_M,
+				 .subopt = M_CRC,
+				 .test_values = true,
+				 .invalid_value = 1,
+				 .at_value = 0,
+				 .message =
+		N_("Lazy superblock counted always enabled for CRC enabled filesytems.")},
+				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = 1,
 			  .flagval = 1,
@@ -858,7 +919,14 @@ struct opt_params {
 			  .flagval = SUBOPT_NEEDS_VAL,
 			},
 			{ .index = N_FTYPE,
-			  .conflicts = { {LAST_CONFLICT} },
+			  .conflicts = {  {.opt = OPT_M,
+				 .subopt = M_CRC,
+				 .test_values = true,
+				 .invalid_value = 1,
+				 .at_value = 0,
+				 .message =
+		N_("Cannot disable ftype with crcs enabled.")},
+					  {LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = 1,
 			  .flagval = 1,
@@ -893,7 +961,15 @@ struct opt_params {
 			  .flagval = SUBOPT_NEEDS_VAL,
 			},
 			{ .index = R_DEV,
-			  .conflicts = { {LAST_CONFLICT} },
+			  .conflicts = {
+				{.opt = OPT_M,
+				 .subopt = M_RMAPBT,
+				 .test_values = false,
+				 .invalid_value = 0,
+				 .at_value = 0,
+				 .message =
+		N_("rmapbt not supported without CRC support.")},
+				{LAST_CONFLICT} },
 			  .flagval = SUBOPT_NEEDS_VAL,
 			},
 			{ .index = R_FILE,
@@ -903,7 +979,15 @@ struct opt_params {
 			  .conflicts = { {LAST_CONFLICT} },
 			},
 			{ .index = R_NAME,
-			  .conflicts = { {LAST_CONFLICT} },
+			  .conflicts = {
+				{.opt = OPT_M,
+				 .subopt = M_RMAPBT,
+				 .test_values = false,
+				 .invalid_value = 0,
+				 .at_value = 0,
+				 .message =
+		N_("rmapbt not supported without CRC support.")},
+				{LAST_CONFLICT} },
 			  .flagval = SUBOPT_NEEDS_VAL,
 			},
 			{ .index = R_NOALIGN,
@@ -1020,13 +1104,92 @@ struct opt_params {
 		},
 		.subopt_params = {
 			{ .index = M_CRC,
-			  .conflicts = { {LAST_CONFLICT} },
+			  .conflicts = {
+				{.opt = OPT_L,
+				 .subopt = L_VERSION,
+				 .test_values = true,
+				 .invalid_value = 1,
+				 .at_value = 1,
+				 .message =
+		N_("V2 logs are required for CRC enabled filesystems.")},
+				{.opt = OPT_I,
+				 .subopt = I_ALIGN,
+				 .test_values = true,
+				 .invalid_value = 0,
+				 .at_value = 1,
+				 .message =
+		N_("Inodes always aligned for CRC enabled filesytems.")},
+				{.opt = OPT_I,
+				 .subopt = I_PROJID32BIT,
+				 .test_values = true,
+				 .invalid_value = 0,
+				 .at_value = 1,
+				 .message =
+		N_("32 bit Project IDs always enabled on CRC enabled filesytems.")},
+			{.opt = OPT_I,
+				 .subopt = I_ATTR,
+				 .test_values = true,
+				 .invalid_value = 1,
+				 .at_value = 1,
+				 .message =
+		N_("V2 attribute format always enabled on CRC enabled filesytems.")},
+			{.opt = OPT_L,
+				 .subopt = L_LAZYSBCNTR,
+				 .test_values = true,
+				 .invalid_value = 0,
+				 .at_value = 1,
+				 .message =
+		N_("Lazy superblock counted always enabled for CRC enabled filesytems.")},
+				{.opt = OPT_M,
+				 .subopt = M_FINOBT,
+				 .test_values = true,
+				 .invalid_value = 1,
+				 .at_value = 0,
+				 .message =
+		N_("Finobt not supported without CRC support.")},
+				{.opt = OPT_M,
+				 .subopt = M_RMAPBT,
+				 .test_values = true,
+				 .invalid_value = 1,
+				 .at_value = 0,
+				 .message =
+		N_("rmapbt not supported without CRC support.")},
+				{.opt = OPT_M,
+				 .subopt = M_REFLINK,
+				 .test_values = true,
+				 .invalid_value = 1,
+				 .at_value = 0,
+				 .message =
+		N_("reflink not supported without CRC support.")},
+				{.opt = OPT_I,
+				 .subopt = I_SPINODES,
+				 .test_values = true,
+				 .invalid_value = 1,
+				 .at_value = 0,
+				 .message =
+		N_("Sparse inodes not supported without CRC support.")},
+				{.opt = OPT_N,
+				 .subopt = N_FTYPE,
+				 .test_values = true,
+				 .invalid_value = 0,
+				 .at_value = 1,
+				 .message =
+		N_("Cannot disable ftype with crcs enabled.")},
+				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = 1,
 			  .flagval = 1,
 			},
 			{ .index = M_FINOBT,
-			  .conflicts = { {LAST_CONFLICT} },
+			  .conflicts = {
+				{.opt = OPT_M,
+				 .subopt = M_CRC,
+				 .test_values = true,
+				 .invalid_value = 0,
+				 .at_value = 1,
+				 .message =
+		N_("Finobt not supported without CRC support\n")},
+				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = 1,
 			  .flagval = 1,
@@ -1036,13 +1199,43 @@ struct opt_params {
 			  .flagval = SUBOPT_NEEDS_VAL,
 			},
 			{ .index = M_RMAPBT,
-			.conflicts = { {LAST_CONFLICT} },
+			.conflicts = {
+				{.opt = OPT_M,
+				 .subopt = M_CRC,
+				 .test_values = true,
+				 .invalid_value = 0,
+				 .at_value = 1,
+				 .message =
+		N_("rmapbt not supported without CRC support.")},
+				{.opt = OPT_R,
+				 .subopt = R_NAME,
+				 .test_values = false,
+				 .invalid_value = 0,
+				 .at_value = 0,
+				 .message =
+		N_("rmapbt not supported with realtime devices.")},
+				{.opt = OPT_R,
+				 .subopt = R_DEV,
+				 .test_values = false,
+				 .invalid_value = 0,
+				 .at_value = 0,
+				 .message =
+		N_("rmapbt not supported with realtime devices.")},
+				{LAST_CONFLICT} },
 			.minval = 0,
 			.maxval = 1,
 			.flagval = 0,
 			},
 			{ .index = M_REFLINK,
-			  .conflicts = { {LAST_CONFLICT} },
+			  .conflicts = {
+				{.opt = OPT_M,
+				 .subopt = M_CRC,
+				 .test_values = true,
+				 .invalid_value = 0,
+				 .at_value = 1,
+				 .message =
+		N_("reflink not supported without CRC support.")},
+				{LAST_CONFLICT} },
 			  .minval = 0,
 			  .maxval = 1,
 			  .flagval = 0,
@@ -2497,11 +2690,16 @@ _("Minimum block size for CRC enabled filesystems is %d bytes.\n"),
 			XFS_MIN_CRC_BLOCKSIZE);
 		usage();
 	}
+
+	/*
+	 * If user explicitly stated -m crc=1 -n ftype=0, an error was already
+	 * issued. But if -n ftype=0 was stated alone, then it is a conflict
+	 * with a default value for crc enabled and has to be detected here.
+	 */
 	if (sb_feat.crcs_enabled && !sb_feat.dirftype) {
 		fprintf(stderr, _("cannot disable ftype with crcs enabled\n"));
 		usage();
 	}
-
 	if (!slflag && !ssflag) {
 		set_conf_val(OPT_D, D_SECTLOG, XFS_MIN_SECTORSIZE_LOG);
 		set_conf_val(OPT_D, D_SECTSIZE, XFS_MIN_SECTORSIZE);
