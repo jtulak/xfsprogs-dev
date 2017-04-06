@@ -50,6 +50,14 @@ unsigned int		sectorsize;
 /*
  * Table for parsing mkfs parameters.
  *
+ * !!! NOTE ==================================================================
+ *
+ * If you are adding a new option, or changing an existing one,
+ * please, update also xfstests - test xfs/191-input-validation
+ * with expected behaviour (simple fail/pass).
+ *
+ * !!! END OF NOTE ===========================================================
+ *
  * Description of the structure members follows:
  *
  * name MANDATORY
@@ -110,6 +118,14 @@ unsigned int		sectorsize;
  *     sets what is used with simple specifying the subopt (-d file).
  *     A special SUBOPT_NEEDS_VAL can be used to require a user-given
  *     value in any case.
+ *
+ * !!! NOTE ==================================================================
+ *
+ * If you are adding a new option, or changing an existing one,
+ * please, update also xfstests - test xfs/191-input-validation
+ * with expected behaviour (simple fail/pass).
+ *
+ * !!! END OF NOTE ===========================================================
  */
 struct opt_params {
 	const char	name;
