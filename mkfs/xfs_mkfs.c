@@ -290,7 +290,7 @@ struct opt_params dopts = {
 		},
 		{ .index = D_RTINHERIT,
 		  .conflicts = { LAST_CONFLICT },
-		  .minval = 1,
+		  .minval = 0,
 		  .maxval = 1,
 		  .defaultval = 1,
 		},
