@@ -52,9 +52,15 @@ getnum(
 {
 	long long	i;
 	char		*sp;
+	int		ret;
+	uint64_t	tmp;
 
-	if (convert)
-		return cvtnum(blksize, sectsize, str);
+	if (convert) {
+		ret = cvtnum(blksize, sectsize, str, &tmp);
+		if (ret)
+			fprintf(stderr, _("Parse error, ret: %d"), ret);
+		return (long long)tmp;
+	}
 
 	i = strtoll(str, &sp, 0);
 	if (i == 0 && sp == str)
