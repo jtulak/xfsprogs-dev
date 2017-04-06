@@ -57,7 +57,7 @@
 #define XFS_NOMULTIDISK_AGLOG		2	/* 4 AGs */
 #define XFS_MULTIDISK_AGCOUNT		(1 << XFS_MULTIDISK_AGLOG)
 
-extern long long cvtnum(unsigned int blksize, unsigned int sectsize,
+extern uint64_t cvtnum(unsigned int blksize, unsigned int sectsize,
 			const char *str);
 
 /* proto.c */
