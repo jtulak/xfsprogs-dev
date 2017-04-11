@@ -17,6 +17,7 @@
  */
 
 #include "libxfs.h"
+#include "libxlog.h"
 #include "xfs_metadump.h"
 
 char 		*progname;
@@ -190,6 +191,87 @@ perform_restore(
 	free(metablock);
 }
 
+/* workaround craziness in the xlog routines */
+int xlog_recover_do_trans(struct xlog *log, xlog_recover_t *t, int p)
+{
+	return 0;
+}
+
+/*
+ * Warn if we just wrote a dump with a dirty log.
+ */
+void
+test_dirty_log(
+	bool	is_target_file,
+	char*	target_name)
+{
+	struct xfs_sb	*sbp;
+	struct xfs_buf	*bp;
+	struct xfs_mount	xmount;
+	struct xfs_mount	*mp;
+	struct xlog		xlog;
+	libxfs_init_t		x;
+
+	x.isreadonly = LIBXFS_ISREADONLY;
+	if (is_target_file) {
+		x.dname = target_name;
+		x.disfile = true;
+	} else {
+		x.disfile = false;
+		x.volname = target_name;
+	}
+
+	if (!libxfs_init(&x)) {
+		fatal(_("\nfatal error -- couldn't initialize XFS library\n"),
+		      strerror(errno));
+	}
+
+	memset(&xmount, 0, sizeof(struct xfs_mount));
+	libxfs_buftarg_init(&xmount, x.ddev, x.logdev, x.rtdev);
+	bp = libxfs_readbuf(xmount.m_ddev_targp, XFS_SB_DADDR,
+			    1 << (XFS_MAX_SECTORSIZE_LOG - BBSHIFT), 0, NULL);
+
+	if (!bp || bp->b_error) {
+		fprintf(stderr, _("%s: %s is invalid (cannot read first 512 "
+			"bytes)\n"), progname, target_name);
+		exit(1);
+	}
+
+	/* copy SB from buffer to in-core, converting architecture as we go */
+	libxfs_sb_from_disk(&xmount.m_sb, XFS_BUF_TO_SBP(bp));
+	libxfs_putbuf(bp);
+	libxfs_purgebuf(bp);
+
+	sbp = &xmount.m_sb;
+	mp = libxfs_mount(&xmount, sbp, x.ddev, x.logdev, x.rtdev,
+			  LIBXFS_MOUNT_DEBUGGER);
+	if (!mp) {
+		fprintf(stderr,
+			_("%s: restored device %s unusable (not an XFS filesystem?)\n"),
+			progname, target_name);
+		exit(1);
+	}
+
+	switch (xlog_is_dirty(mp, &xlog, &x,0)) {
+		case -1:
+			/* An error occured and we can't read the log. */
+			fprintf(stderr,
+			_("Warning: can't discern a log.\n"));
+			break;
+		case 1:
+			/* The log is dirty, warn. */
+			fprintf(stderr,
+			_("Warning: The log is dirty. If the image was obfuscated, "
+			  "an attempt to replay the log may lead to corruption.\n"));
+			break;
+		case 0:
+			 /* Everything is ok. */
+			break;
+	}
+
+}
+
+
 static void
 usage(void)
 {
@@ -270,6 +352,8 @@ main(
 	close(dst_fd);
 	if (src_f != stdin)
 		fclose(src_f);
+
+	test_dirty_log(is_target_file, argv[optind]);
 
 	return 0;
 }
