@@ -789,6 +789,38 @@ get_conf_raw(int opt, int subopt)
 	return opts[opt].subopt_params[subopt].raw_input;
 }
 
+static uint64_t getnum(const char *str, struct opt_params *opts, int index);
+
+/*
+ * Get and set values to the opts table.
+ */
+static inline uint64_t
+get_conf_val(int opt, int subopt)
+{
+	return opts[opt].subopt_params[subopt].value;
+}
+
+static void
+set_conf_val(int opt, int subopt, uint64_t val)
+{
+	struct subopt_param *sp = &opts[opt].subopt_params[subopt];
+
+	sp->value = val;
+}
+
+/*
+ * A wrapper for getnum and set_conf_val.
+ */
+static inline uint64_t
+parse_conf_val(int opt, int subopt, char *value)
+{
+	uint64_t num = getnum(value, &opts[opt], subopt);
+
+	set_conf_val(opt, subopt, num);
+	return num;
+}
+
+
 /*
  * Convert lsu to lsunit for 512 bytes blocks and check validity of the values.
  */
