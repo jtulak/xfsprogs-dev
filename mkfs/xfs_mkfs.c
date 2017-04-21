@@ -128,6 +128,15 @@ uint64_t		sectorsize;
  *     Filled raw string from the user, so we never lose that information e.g.
  *     to print it back in case of an issue.
  *
+ *   value OPTIONAL
+ *     The actual value used in computations and for creating the filesystem.
+ *     It is filled with user input and anything you write here now is
+ *     overwritten if user specifies the subopt. But he does not, then whatever
+ *     you put there is used as the default. Can be omitted if the default
+ *     is 0.
+ *     (If the field is a string and not a number, this value is set to
+ *     a positive non-zero number on an user input.)
+ *
  * !!! NOTE ==================================================================
  *
  * If you are adding a new option, or changing an existing one,
@@ -152,6 +161,7 @@ struct opt_params {
 		uint64_t	maxval;
 		uint64_t	flagval;
 		const char	*raw_input;
+		uint64_t	value;
 	}		subopt_params[MAX_SUBOPTS];
 } opts[MAX_OPTS] = {
 #define OPT_B	0
