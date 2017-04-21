@@ -1364,6 +1364,7 @@ getnum(
 	int			ret;
 
 	check_opt(opts, index, false);
+	set_conf_raw(opts, index, str);
 	/* empty strings might just return a default value */
 	if (!str || *str == '\0') {
 		if (sp->flagval == SUBOPT_NEEDS_VAL)
@@ -1467,7 +1468,7 @@ main(
 	char			*dfile;
 	uint64_t		dirblocklog;
 	uint64_t		dirblocksize;
-	char			*dsize;
+	uint64_t		dbytes;
 	uint64_t		dsu;
 	uint64_t		dsw;
 	uint64_t		dsunit;
@@ -1491,7 +1492,7 @@ main(
 	xfs_rfsblock_t		logblocks;
 	char			*logfile;
 	uint64_t		loginternal;
-	char			*logsize;
+	uint64_t		logbytes;
 	xfs_fsblock_t		logstart;
 	bool			lvflag;
 	bool			lsflag;
@@ -1520,11 +1521,11 @@ main(
 	char			*protostring;
 	bool			qflag;
 	xfs_rfsblock_t		rtblocks;
+	uint64_t		rtbytes;
 	xfs_extlen_t		rtextblocks;
 	xfs_rtblock_t		rtextents;
-	char			*rtextsize;
+	uint64_t		rtextbytes;
 	char			*rtfile;
-	char			*rtsize;
 	xfs_sb_t		*sbp;
 	uint64_t		sectorlog;
 	uint64_t		sector_mask;
@@ -1572,7 +1573,8 @@ main(
 	qflag = false;
 	imaxpct = inodelog = inopblock = isize = 0;
 	dfile = logfile = rtfile = NULL;
-	dsize = logsize = rtsize = rtextsize = protofile = NULL;
+	protofile = NULL;
+	rtbytes = rtextbytes = logbytes = dbytes = 0;
 	dsu = dsw = dsunit = dswidth = lalign = lsu = lsunit = 0;
 	nodsflag = norsflag = false;
 	force_overwrite = false;
@@ -1636,7 +1638,7 @@ main(
 					xi.dname = getstr(value, &dopts, D_NAME);
 					break;
 				case D_SIZE:
-					dsize = getstr(value, &dopts, D_SIZE);
+					dbytes = getnum(value, &dopts, D_SIZE);
 					break;
 				case D_SUNIT:
 					dsunit = getnum(value, &dopts, D_SUNIT);
@@ -1781,7 +1783,7 @@ main(
 					lvflag = 1;
 					break;
 				case L_SIZE:
-					logsize = getstr(value, &lopts, L_SIZE);
+					logbytes = getnum(value, &lopts, L_SIZE);
 					break;
 				case L_SECTLOG:
 					lsectorlog = getnum(value, &lopts,
@@ -1910,8 +1912,7 @@ main(
 
 				switch (getsubopt(&p, subopts, &value)) {
 				case R_EXTSIZE:
-					rtextsize = getstr(value, &ropts,
-							   R_EXTSIZE);
+					rtextbytes = getnum(value, &ropts, R_EXTSIZE);
 					break;
 				case R_FILE:
 					xi.risfile = getnum(value, &ropts,
@@ -1923,7 +1924,7 @@ main(
 							   R_NAME);
 					break;
 				case R_SIZE:
-					rtsize = getstr(value, &ropts, R_SIZE);
+					rtbytes = getnum(value, &ropts, R_SIZE);
 					break;
 				case R_NOALIGN:
 					norsflag = getnum(value, &ropts,
@@ -2026,14 +2027,14 @@ _("Minimum block size for CRC enabled filesystems is %d bytes.\n"),
 	 * sector size mismatches between the new filesystem and the underlying
 	 * host filesystem.
 	 */
-	check_device_type(dfile, &xi.disfile, !dsize, !dfile,
+	check_device_type(dfile, &xi.disfile, !dbytes, !dfile,
 			  Nflag ? NULL : &xi.dcreat, force_overwrite, "d");
 	if (!loginternal)
-		check_device_type(xi.logname, &xi.lisfile, !logsize, !xi.logname,
-				  Nflag ? NULL : &xi.lcreat,
+		check_device_type(xi.logname, &xi.lisfile, !logbytes,
+				  !xi.logname, Nflag ? NULL : &xi.lcreat,
 				  force_overwrite, "l");
 	if (xi.rtname)
-		check_device_type(xi.rtname, &xi.risfile, !rtsize, !xi.rtname,
+		check_device_type(xi.rtname, &xi.risfile, !rtbytes, !xi.rtname,
 				  Nflag ? NULL : &xi.rcreat,
 				  force_overwrite, "r");
 	if (xi.disfile || xi.lisfile || xi.risfile)
@@ -2214,10 +2215,7 @@ _("rmapbt not supported with realtime devices\n"));
 	}
 
 
-	if (dsize) {
-		uint64_t dbytes;
-
-		dbytes = getnum(dsize, &dopts, D_SIZE);
+	if (dbytes) {
 		if (dbytes % XFS_MIN_BLOCKSIZE) {
 			fprintf(stderr,
 			_("illegal data length %"PRIu64", not a multiple of %d\n"),
@@ -2246,10 +2244,7 @@ _("rmapbt not supported with realtime devices\n"));
 		usage();
 	}
 
-	if (logsize) {
-		uint64_t logbytes;
-
-		logbytes = getnum(logsize, &lopts, L_SIZE);
+	if (logbytes) {
 		if (logbytes % XFS_MIN_BLOCKSIZE) {
 			fprintf(stderr,
 			_("illegal log length %"PRIu64", not a multiple of %d\n"),
@@ -2263,10 +2258,7 @@ _("rmapbt not supported with realtime devices\n"));
 				logbytes, blocksize,
 				(uint64_t)(logblocks << blocklog));
 	}
-	if (rtsize) {
-		uint64_t rtbytes;
-
-		rtbytes = getnum(rtsize, &ropts, R_SIZE);
+	if (rtbytes) {
 		if (rtbytes % XFS_MIN_BLOCKSIZE) {
 			fprintf(stderr,
 			_("illegal rt length %"PRIu64", not a multiple of %d\n"),
@@ -2283,10 +2275,7 @@ _("rmapbt not supported with realtime devices\n"));
 	/*
 	 * If specified, check rt extent size against its constraints.
 	 */
-	if (rtextsize) {
-		uint64_t rtextbytes;
-
-		rtextbytes = getnum(rtextsize, &ropts, R_EXTSIZE);
+	if (rtextbytes) {
 		if (rtextbytes % blocksize) {
 			fprintf(stderr,
 		_("illegal rt extent size %"PRIu64", not a multiple of %"PRIu64"\n"),
@@ -2303,7 +2292,7 @@ _("rmapbt not supported with realtime devices\n"));
 		uint64_t	rswidth;
 		uint64_t	rtextbytes;
 
-		if (!norsflag && !xi.risfile && !(!rtsize && xi.disfile))
+		if (!norsflag && !xi.risfile && !(!rtbytes && xi.disfile))
 			rswidth = ft.rtswidth;
 		else
 			rswidth = 0;
@@ -2414,15 +2403,16 @@ _("rmapbt not supported with realtime devices\n"));
 		rtfile = _("volume rt");
 	else if (!xi.rtdev)
 		rtfile = _("none");
-	if (dsize && xi.dsize > 0 && dblocks > DTOBT(xi.dsize)) {
+	if (dbytes && xi.dsize > 0 && dblocks > DTOBT(xi.dsize)) {
 		fprintf(stderr,
 			_("size %s specified for data subvolume is too large, "
 			"maximum is %"PRIu64" blocks\n"),
-			dsize, (uint64_t)DTOBT(xi.dsize));
+			get_conf_raw(&dopts, D_SIZE),
+			(uint64_t)DTOBT(xi.dsize));
 		usage();
-	} else if (!dsize && xi.dsize > 0)
+	} else if (!dbytes && xi.dsize > 0)
 		dblocks = DTOBT(xi.dsize);
-	else if (!dsize) {
+	else if (!dbytes) {
 		fprintf(stderr, _("can't get size of data subvolume\n"));
 		usage();
 	}
@@ -2455,22 +2445,23 @@ reported by the device (%u).\n"),
 reported by the device (%u).\n"),
 			lsectorsize, xi.lbsize);
 	}
-	if (rtsize && xi.rtsize > 0 && xi.rtbsize > sectorsize) {
+	if (rtbytes && xi.rtsize > 0 && xi.rtbsize > sectorsize) {
 		fprintf(stderr, _(
 "Warning: the realtime subvolume sector size %"PRIu64" is less than the sector size\n\
 reported by the device (%u).\n"),
 			sectorsize, xi.rtbsize);
 	}
 
-	if (rtsize && xi.rtsize > 0 && rtblocks > DTOBT(xi.rtsize)) {
+	if (rtbytes && xi.rtsize > 0 && rtblocks > DTOBT(xi.rtsize)) {
 		fprintf(stderr,
 			_("size %s specified for rt subvolume is too large, "
 			"maximum is %"PRIu64" blocks\n"),
-			rtsize, (uint64_t)DTOBT(xi.rtsize));
+			get_conf_raw(&ropts, R_SIZE),
+			(uint64_t)DTOBT(xi.rtsize));
 		usage();
-	} else if (!rtsize && xi.rtsize > 0)
+	} else if (!rtbytes && xi.rtsize > 0)
 		rtblocks = DTOBT(xi.rtsize);
-	else if (rtsize && !xi.rtdev) {
+	else if (rtbytes && !xi.rtdev) {
 		fprintf(stderr,
 			_("size specified for non-existent rt subvolume\n"));
 		usage();
@@ -2675,26 +2666,27 @@ an AG size that is one stripe unit smaller, for example %"PRIu64".\n"),
 				   sb_feat.rmapbt, sb_feat.reflink);
 	ASSERT(min_logblocks);
 	min_logblocks = MAX(XFS_MIN_LOG_BLOCKS, min_logblocks);
-	if (!logsize && dblocks >= (1024*1024*1024) >> blocklog)
+	if (!logbytes && dblocks >= (1024*1024*1024) >> blocklog)
 		min_logblocks = MAX(min_logblocks, XFS_MIN_LOG_BYTES>>blocklog);
-	if (logsize && xi.logBBsize > 0 && logblocks > DTOBT(xi.logBBsize)) {
+	if (logbytes && xi.logBBsize > 0 && logblocks > DTOBT(xi.logBBsize)) {
 		fprintf(stderr,
 _("size %s specified for log subvolume is too large, maximum is %"PRIu64" blocks\n"),
-			logsize, (uint64_t)DTOBT(xi.logBBsize));
+			get_conf_raw(&lopts, L_SIZE),
+			(uint64_t)DTOBT(xi.logBBsize));
 		usage();
-	} else if (!logsize && xi.logBBsize > 0) {
+	} else if (!logbytes && xi.logBBsize > 0) {
 		logblocks = DTOBT(xi.logBBsize);
-	} else if (logsize && !xi.logdev && !loginternal) {
+	} else if (logbytes && !xi.logdev && !loginternal) {
 		fprintf(stderr,
 			_("size specified for non-existent log subvolume\n"));
 		usage();
-	} else if (loginternal && logsize && logblocks >= dblocks) {
+	} else if (loginternal && logbytes && logblocks >= dblocks) {
 		fprintf(stderr, _("size %"PRIu64" too large for internal log\n"),
 			logblocks);
 		usage();
 	} else if (!loginternal && !xi.logdev) {
 		logblocks = 0;
-	} else if (loginternal && !logsize) {
+	} else if (loginternal && !logbytes) {
 
 		if (dblocks < GIGABYTES(1, blocklog)) {
 			/* tiny filesystems get minimum sized logs. */
@@ -2758,7 +2750,7 @@ _("size %s specified for log subvolume is too large, maximum is %"PRIu64" blocks
 		 * Readjust the log size to fit within an AG if it was sized
 		 * automatically.
 		 */
-		if (!logsize) {
+		if (!logbytes) {
 			logblocks = MIN(logblocks,
 					libxfs_alloc_ag_max_usable(mp));
 
