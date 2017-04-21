@@ -119,6 +119,10 @@ uint64_t		sectorsize;
  *     A special SUBOPT_NEEDS_VAL can be used to require a user-given
  *     value in any case.
  *
+ *   raw_input INTERNAL
+ *     Filled raw string from the user, so we never lose that information e.g.
+ *     to print it back in case of an issue.
+ *
  * !!! NOTE ==================================================================
  *
  * If you are adding a new option, or changing an existing one,
@@ -141,6 +145,7 @@ struct opt_params {
 		uint64_t	minval;
 		uint64_t	maxval;
 		uint64_t	defaultval;
+		const char	*raw_input;
 	}		subopt_params[MAX_SUBOPTS];
 };
 
@@ -747,6 +752,18 @@ struct opt_params mopts = {
  * remove traces of other filesystems, raid superblocks, etc.
  */
 #define WHACK_SIZE (128 * 1024)
+
+static inline void
+set_conf_raw(struct opt_params *opt, int subopt, const char *value)
+{
+	opt->subopt_params[subopt].raw_input = value;
+}
+
+static inline const char *
+get_conf_raw(const struct opt_params *opt, int subopt)
+{
+	return opt->subopt_params[subopt].raw_input;
+}
 
 /*
  * Convert lsu to lsunit for 512 bytes blocks and check validity of the values.
