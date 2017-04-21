@@ -107,6 +107,11 @@ unsigned int		sectorsize;
  *     sets what is used with simple specifying the subopt (-d file).
  *     A special SUBOPT_NEEDS_VAL can be used to require a user-given
  *     value in any case.
+ *
+ *   raw_input INTERNAL
+ *     Filled raw string from the user, so we never lose that information e.g.
+ *     to print it back in case of an issue.
+ *
  */
 struct opt_params {
 	const char	name;
@@ -122,6 +127,7 @@ struct opt_params {
 		long long	minval;
 		long long	maxval;
 		long long	defaultval;
+		char		*raw_input;
 	}		subopt_params[MAX_SUBOPTS];
 };
 
@@ -728,6 +734,88 @@ struct opt_params mopts = {
  * remove traces of other filesystems, raid superblocks, etc.
  */
 #define WHACK_SIZE (128 * 1024)
+
+/*
+ * Return 0 on success, -ENOMEM if it could not allocate enough memory for
+ * the string to be saved.
+ */
+static int
+set_conf_raw(struct opt_params *opt, const int subopt, const char *value)
+{
+	if (subopt < 0 || subopt >= MAX_SUBOPTS) {
+		fprintf(stderr,
+			_("This is a bug: set_conf_raw called with invalid "
+			  "opt/subopt: %c/%d\n"),
+			opt->name, subopt);
+		return -EINVAL;
+	}
+	if (value == NULL) {
+		if (opt->subopt_params[subopt].raw_input != NULL)
+			free(opt->subopt_params[subopt].raw_input);
+		opt->subopt_params[subopt].raw_input = NULL;
+	} else {
+		opt->subopt_params[subopt].raw_input = strdup(value);
+		if (opt->subopt_params[subopt].raw_input == NULL)
+			return -ENOMEM;
+	}
+	return 0;
+}
+
+/*
+ * Same as set_conf_raw(), except if any error occurs, return NULL.
+ */
+static void
+set_conf_raw_safe(struct opt_params *opt, const int subopt, const char *value)
+{
+	if (set_conf_raw(opt, subopt, value) != 0) {
+		exit(1);
+	}
+}
+
+/*
+ * Return 0 on success, -ENOMEM if it could not allocate enough memory for
+ * the string to be saved into the out pointer.
+ */
+static int
+get_conf_raw(const struct opt_params *opt, const int subopt, char **out)
+{
+	if (subopt < 0 || subopt >= MAX_SUBOPTS) {
+		fprintf(stderr,
+			_("This is a bug: get_conf_raw called with invalid "
+			  "opt/subopt: %c/%d\n"),
+			opt->name, subopt);
+		return -EINVAL;
+	}
+
+	if (opt->subopt_params[subopt].raw_input == NULL) {
+		*out = NULL;
+		return 0;
+	}
+
+	*out = strdup(opt->subopt_params[subopt].raw_input);
+	if (*out == NULL)
+		return -ENOMEM;
+	return 0;
+
+}
+
+/*
+ * Same as get_conf_raw(), except it returns the string through return.
+ * If any error occurs, return NULL.
+ */
+static char *
+get_conf_raw_safe(const struct opt_params *opt, const int subopt)
+{
+	char *str;
+
+	str = NULL;
+
+	if (get_conf_raw(opt, subopt, &str) == -ENOMEM) {
+		fprintf(stderr, "Out of memory!");
+		return NULL;
+	}
+	return str;
+}
 
 /*
  * Convert lsu to lsunit for 512 bytes blocks and check validity of the values.
