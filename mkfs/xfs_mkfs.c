@@ -448,6 +448,7 @@ struct opt_params {
 			  .minval = 0,
 			  .maxval = 1,
 			  .flagval = 1,
+			  .value = 1,
 			},
 			{ .index = L_SIZE,
 			  .conflicts = { LAST_CONFLICT },
@@ -1122,7 +1123,8 @@ parse_conf_val(int opt, int subopt, char *value)
 }
 
 /*
- * Convert lsu to lsunit for 512 bytes blocks and check validity of the values.
+ * Convert L_SU to L_SUNIT for 512 bytes blocks and check validity of the
+ * values.
  */
 static void
 calc_stripe_factors(
@@ -1174,7 +1176,7 @@ calc_stripe_factors(
 	if (lsu)
 		*lsunit = (int)BTOBBT(lsu);
 
-	/* verify if lsu/lsunit is a multiple block size */
+	/* verify if L_SU/L_SUNIT is a multiple block size */
 	if (lsu % get_conf_val(OPT_B, B_SIZE) != 0) {
 		fprintf(stderr,
 _("log stripe unit (%d) must be a multiple of the block size (%lld)\n"),
@@ -1698,22 +1700,15 @@ main(
 	int			lalign;
 	int			ldflag;
 	int			liflag;
-	xfs_agnumber_t		logagno;
 	xfs_rfsblock_t		logblocks;
 	char			*logfile;
-	int			loginternal;
-	uint64_t		logbytes;
 	xfs_fsblock_t		logstart;
 	int			lvflag;
 	int			lsflag;
 	int			lsuflag;
 	int			lsunitflag;
-	int			lsectorlog;
-	int			lsectorsize;
 	int			lslflag;
 	int			lssflag;
-	int			lsu;
-	int			lsunit;
 	int			min_logblocks;
 	xfs_mount_t		*mp;
 	xfs_mount_t		mbuf;
@@ -1768,20 +1763,17 @@ main(
 	textdomain(PACKAGE);
 
 	blflag = bsflag = slflag = ssflag = lslflag = lssflag = 0;
-	lsectorlog = 0;
-	lsectorsize = 0;
 	dasize = dblocks = 0;
 	daflag = ilflag = imflag = ipflag = isflag = false;
 	liflag = laflag = lsflag = lsuflag = lsunitflag = ldflag = lvflag = false;
-	loginternal = 1;
-	logagno = logblocks = rtblocks = rtextblocks = 0;
-	Nflag = nlflag = nsflag = nvflag = 0;
+	logblocks = rtblocks = rtextblocks = 0;
+	Nflag = nlflag = nsflag = nvflag = false;
 	dirblocklog = dirblocksize = 0;
 	qflag = false;
 	dfile = logfile = rtfile = NULL;
 	protofile = NULL;
-	rtbytes = rtextbytes = logbytes = 0;
-	lalign = lsu = lsunit = 0;
+	rtbytes = rtextbytes = 0;
+	lalign = 0;
 	dsflag = norsflag = false;
 	force_overwrite = false;
 	worst_freelist = 0;
@@ -1970,9 +1962,7 @@ main(
 
 				switch (getsubopt(&p, subopts, &value)) {
 				case L_AGNUM:
-					logagno = parse_conf_val(OPT_L,
-								 L_AGNUM,
-								 value);
+					parse_conf_val(OPT_L, L_AGNUM, value);
 					laflag = 1;
 					break;
 				case L_FILE:
@@ -1981,20 +1971,16 @@ main(
 								    value);
 					break;
 				case L_INTERNAL:
-					loginternal =
-						parse_conf_val(OPT_L,
-							       L_INTERNAL,
-							       value);
+					parse_conf_val(OPT_L, L_INTERNAL,
+						       value);
 					liflag = 1;
 					break;
 				case L_SU:
-					lsu = parse_conf_val(OPT_L, L_SU,
-							     value);
+					parse_conf_val(OPT_L, L_SU, value);
 					lsuflag = 1;
 					break;
 				case L_SUNIT:
-					lsunit = parse_conf_val(OPT_L, L_SUNIT,
-								value);
+					parse_conf_val(OPT_L, L_SUNIT, value);
 					lsunitflag = 1;
 					break;
 				case L_NAME:
@@ -2003,7 +1989,7 @@ main(
 								L_NAME);
 					xi.logname = logfile;
 					ldflag = 1;
-					loginternal = 0;
+					set_conf_val(OPT_L, L_INTERNAL, 0);
 					set_conf_val(OPT_L, L_NAME, 1);
 					set_conf_val(OPT_L, L_DEV, 1);
 					break;
@@ -2015,24 +2001,18 @@ main(
 					lvflag = 1;
 					break;
 				case L_SIZE:
-					logbytes = parse_conf_val(OPT_L,
-								  L_SIZE,
-								  value);
+					parse_conf_val(OPT_L, L_SIZE, value);
 					break;
 				case L_SECTLOG:
-					lsectorlog = parse_conf_val(OPT_L,
+					parse_conf_val(OPT_L,
 								    L_SECTLOG,
 								    value);
-					lsectorsize = 1 << lsectorlog;
 					lslflag = 1;
 					break;
 				case L_SECTSIZE:
-					lsectorsize =
 						parse_conf_val(OPT_L,
 							       L_SECTSIZE,
 							       value);
-					lsectorlog =
-						libxfs_highbit32(lsectorsize);
 					lssflag = 1;
 					break;
 				case L_LAZYSBCNTR:
@@ -2202,7 +2182,6 @@ main(
 				char	**subopts =
 						(char **)opts[OPT_S].subopts;
 				char	*value;
-				uint64_t tmp;
 
 				switch (getsubopt(&p, subopts, &value)) {
 				case S_LOG:
@@ -2211,12 +2190,8 @@ main(
 						conflict('s', subopts,
 							 S_SECTSIZE,
 							 S_SECTLOG);
-					tmp = parse_conf_val(OPT_S,
-								   S_SECTLOG,
-								   value);
-
-					lsectorlog = tmp;
-					lsectorsize = tmp;
+					parse_conf_val(OPT_S, S_SECTLOG,
+							value);
 					lslflag = slflag = 1;
 					break;
 				case S_SIZE:
@@ -2225,12 +2200,8 @@ main(
 						conflict('s', subopts,
 							 S_SECTLOG,
 							 S_SECTSIZE);
-					tmp = parse_conf_val(OPT_S,
-								    S_SECTSIZE,
-								    value);
-
-					lsectorlog = libxfs_highbit32(tmp);
-					lsectorsize = tmp;
+					parse_conf_val(OPT_S, S_SECTSIZE,
+							value);
 					lssflag = ssflag = 1;
 					break;
 				default:
@@ -2286,8 +2257,9 @@ _("Minimum block size for CRC enabled filesystems is %d bytes.\n"),
 		set_conf_val(OPT_D, D_SECTSIZE, XFS_MIN_SECTORSIZE);
 	}
 	if (!lslflag && !lssflag) {
-		lsectorlog = get_conf_val(OPT_D, D_SECTLOG);
-		lsectorsize = get_conf_val(OPT_D, D_SECTSIZE);
+		set_conf_val(OPT_L, L_SECTLOG, get_conf_val(OPT_D, D_SECTLOG));
+		set_conf_val(OPT_L, L_SECTSIZE,
+			     get_conf_val(OPT_D, D_SECTSIZE));
 	}
 
 	/*
@@ -2300,8 +2272,9 @@ _("Minimum block size for CRC enabled filesystems is %d bytes.\n"),
 	check_device_type(dfile, &xi.disfile, !get_conf_val(OPT_D, D_SIZE),
 			  !dfile,
 			  Nflag ? NULL : &xi.dcreat, force_overwrite, "d");
-	if (!loginternal)
-		check_device_type(xi.logname, &xi.lisfile, !logbytes,
+	if (!get_conf_val(OPT_L, L_INTERNAL))
+		check_device_type(xi.logname, &xi.lisfile,
+				  !get_conf_val(OPT_L, L_SIZE),
 				  !xi.logname, Nflag ? NULL : &xi.lcreat,
 				  force_overwrite, "l");
 	if (xi.rtname)
@@ -2349,9 +2322,11 @@ _("switching to logical sector size %d\n"),
 	if (!ssflag) {
 		set_conf_val(OPT_D, D_SECTLOG,
 			     libxfs_highbit32(get_conf_val(OPT_D, D_SECTSIZE)));
-		if (loginternal) {
-			lsectorsize = get_conf_val(OPT_D, D_SECTSIZE);
-			lsectorlog = get_conf_val(OPT_D, D_SECTLOG);
+		if (get_conf_val(OPT_L, L_INTERNAL)) {
+			set_conf_val(OPT_L, L_SECTSIZE,
+				     get_conf_val(OPT_D, D_SECTSIZE));
+			set_conf_val(OPT_L, L_SECTLOG,
+				     get_conf_val(OPT_D, D_SECTLOG));
 		}
 	}
 
@@ -2372,13 +2347,16 @@ _("block size %lld cannot be smaller than logical sector size %d\n"),
 			get_conf_val(OPT_D, D_SECTSIZE), ft.lsectorsize);
 		usage();
 	}
-	if (lsectorsize < XFS_MIN_SECTORSIZE ||
-	    lsectorsize > XFS_MAX_SECTORSIZE ||
-	    lsectorsize > get_conf_val(OPT_B, B_SIZE)) {
-		fprintf(stderr, _("illegal log sector size %d\n"), lsectorsize);
+	if (get_conf_val(OPT_L, L_SECTSIZE) < XFS_MIN_SECTORSIZE ||
+	    get_conf_val(OPT_L, L_SECTSIZE) > XFS_MAX_SECTORSIZE ||
+	    get_conf_val(OPT_L, L_SECTSIZE) > get_conf_val(OPT_B, B_SIZE)) {
+		fprintf(stderr, _("illegal log sector size %lld\n"),
+			get_conf_val(OPT_L, L_SECTSIZE));
 		usage();
-	} else if (lsectorsize > XFS_MIN_SECTORSIZE && !lsu && !lsunit) {
-		lsu = get_conf_val(OPT_B, B_SIZE);
+	} else if (get_conf_val(OPT_L, L_SECTSIZE) > XFS_MIN_SECTORSIZE &&
+		   !get_conf_val(OPT_L, L_SU) &&
+		   !get_conf_val(OPT_L, L_SUNIT)) {
+		set_conf_val(OPT_L, L_SU, get_conf_val(OPT_B, B_SIZE));
 		sb_feat.log_version = 2;
 	}
 
@@ -2531,19 +2509,20 @@ _("rmapbt not supported with realtime devices\n"));
 		usage();
 	}
 
-	if (logbytes) {
-		if (logbytes % XFS_MIN_BLOCKSIZE) {
+	if (get_conf_val(OPT_L, L_SIZE)) {
+		if (get_conf_val(OPT_L, L_SIZE) % XFS_MIN_BLOCKSIZE) {
 			fprintf(stderr,
 			_("illegal log length %lld, not a multiple of %d\n"),
-				(long long)logbytes, XFS_MIN_BLOCKSIZE);
+				get_conf_val(OPT_L, L_SIZE), XFS_MIN_BLOCKSIZE);
 			usage();
 		}
-		logblocks = (xfs_rfsblock_t)(logbytes >>
+		logblocks = (xfs_rfsblock_t)(get_conf_val(OPT_L, L_SIZE) >>
 					     get_conf_val(OPT_B, B_LOG));
-		if (logbytes % get_conf_val(OPT_B, B_SIZE))
+		if (get_conf_val(OPT_L, L_SIZE) % get_conf_val(OPT_B, B_SIZE))
 			fprintf(stderr,
 	_("warning: log length %lld not a multiple of %lld, truncated to %lld\n"),
-				(long long)logbytes, get_conf_val(OPT_B, B_SIZE),
+				get_conf_val(OPT_L, L_SIZE),
+				get_conf_val(OPT_B, B_SIZE),
 				(long long)(logblocks <<
 					   get_conf_val(OPT_B, B_LOG)));
 	}
@@ -2635,8 +2614,9 @@ _("rmapbt not supported with realtime devices\n"));
 		exit(1);
 	}
 
-	/* if lsu or lsunit was specified, automatically use v2 logs */
-	if ((lsu || lsunit) && sb_feat.log_version == 1) {
+	/* if L_SU or L_SUNIT was specified, automatically use v2 logs */
+	if ((get_conf_val(OPT_L, L_SU) ||
+	     get_conf_val(OPT_L, L_SUNIT)) && sb_feat.log_version == 1) {
 		fprintf(stderr,
 			_("log stripe unit specified, using v2 logs\n"));
 		sb_feat.log_version = 2;
@@ -2644,13 +2624,14 @@ _("rmapbt not supported with realtime devices\n"));
 
 	int dsunit = get_conf_val(OPT_D, D_SUNIT);
 	int dswidth = get_conf_val(OPT_D, D_SWIDTH);
+	int lsunit = get_conf_val(OPT_L, L_SUNIT);
 
 	calc_stripe_factors(get_conf_val(OPT_D, D_SU),
 			    get_conf_val(OPT_D, D_SW),
 			    get_conf_val(OPT_D, D_SECTSIZE),
-			    lsu,
-			    lsectorsize,
-				&dsunit, &dswidth, &lsunit);
+			    get_conf_val(OPT_L, L_SU),
+			    get_conf_val(OPT_L, L_SECTSIZE),
+			    &dsunit, &dswidth, &lsunit);
 
 	/* If sunit & swidth were manually specified as 0, same as noalign */
 	if (dsflag && !dsunit && !dswidth)
@@ -2658,6 +2639,7 @@ _("rmapbt not supported with realtime devices\n"));
 
 	set_conf_val(OPT_D, D_SUNIT, dsunit);
 	set_conf_val(OPT_D, D_SWIDTH, dswidth);
+	set_conf_val(OPT_L, L_SUNIT, lsunit);
 
 	xi.setblksize = get_conf_val(OPT_D, D_SECTSIZE);
 
@@ -2686,7 +2668,8 @@ _("rmapbt not supported with realtime devices\n"));
 		(MAX(get_conf_val(OPT_D, D_SECTLOG), 10) - BBSHIFT);
 	xi.dsize &= sector_mask;
 	xi.rtsize &= sector_mask;
-	xi.logBBsize &= (uint64_t)-1 << (MAX(lsectorlog, 10) - BBSHIFT);
+	xi.logBBsize &= (uint64_t)-1 << (MAX(get_conf_val(OPT_L, L_SECTLOG),
+					     10) - BBSHIFT);
 
 
 	/* don't do discards on print-only runs or on files */
@@ -2700,10 +2683,10 @@ _("rmapbt not supported with realtime devices\n"));
 	}
 
 	if (!liflag && !ldflag)
-		loginternal = xi.logdev == 0;
+		set_conf_val(OPT_L, L_INTERNAL, xi.logdev == 0);
 	if (xi.logname)
 		logfile = xi.logname;
-	else if (loginternal)
+	else if (get_conf_val(OPT_L, L_INTERNAL))
 		logfile = _("internal log");
 	else if (xi.volname && xi.logdev)
 		logfile = _("volume log");
@@ -2739,12 +2722,13 @@ _("rmapbt not supported with realtime devices\n"));
 		usage();
 	}
 
-	if (loginternal && xi.logdev) {
+	if (get_conf_val(OPT_L, L_INTERNAL) && xi.logdev) {
 		fprintf(stderr,
 			_("can't have both external and internal logs\n"));
 		usage();
-	} else if (loginternal &&
-		   get_conf_val(OPT_D, D_SECTSIZE) != lsectorsize) {
+	} else if (get_conf_val(OPT_L, L_INTERNAL) &&
+		   get_conf_val(OPT_D, D_SECTSIZE) !=
+		   get_conf_val(OPT_L, L_SECTSIZE)) {
 		fprintf(stderr,
 	_("data and log sector sizes must be equal for internal logs\n"));
 		usage();
@@ -2756,11 +2740,12 @@ _("rmapbt not supported with realtime devices\n"));
 reported by the device (%u).\n"),
 			get_conf_val(OPT_D, D_SECTSIZE), xi.dbsize);
 	}
-	if (!loginternal && xi.lbsize > lsectorsize) {
+	if (!get_conf_val(OPT_L, L_INTERNAL) &&
+	    xi.lbsize > get_conf_val(OPT_L, L_SECTSIZE)) {
 		fprintf(stderr, _(
-"Warning: the log subvolume sector size %u is less than the sector size\n\
+"Warning: the log subvolume sector size %lld is less than the sector size\n\
 reported by the device (%u).\n"),
-			lsectorsize, xi.lbsize);
+			get_conf_val(OPT_L, L_SECTSIZE), xi.lbsize);
 	}
 	if (rtbytes && xi.rtsize > 0 &&
 	    xi.rtbsize > get_conf_val(OPT_D, D_SECTSIZE)) {
@@ -3038,27 +3023,31 @@ an AG size that is one stripe unit smaller, for example %llu.\n"),
 	 * check that log sunit is modulo fsblksize or default it to D_SUNIT.
 	 */
 
-	if (lsunit) {
+	if (get_conf_val(OPT_L, L_SUNIT)) {
 		/* convert from 512 byte blocks to fs blocks */
-		lsunit = DTOBT(lsunit);
+		set_conf_val(OPT_L, L_SUNIT,
+			     DTOBT(get_conf_val(OPT_L, L_SUNIT)));
 	} else if (sb_feat.log_version == 2 &&
-		   loginternal &&
+		   get_conf_val(OPT_L, L_INTERNAL) &&
 		   get_conf_val(OPT_D, D_SUNIT)) {
-		/* lsunit and get_conf_val(OPT_D, D_SUNIT) now in fs blocks */
-		lsunit = get_conf_val(OPT_D, D_SUNIT);
+		/* L_SUNIT and D_SUNIT now in fs blocks */
+		set_conf_val(OPT_L, L_SUNIT, get_conf_val(OPT_D, D_SUNIT));
 	}
 
 	if (sb_feat.log_version == 2 &&
-	    (lsunit * get_conf_val(OPT_B, B_SIZE)) > 256 * 1024) {
+	    (get_conf_val(OPT_L, L_SUNIT) *
+	     get_conf_val(OPT_B, B_SIZE)) > 256 * 1024) {
 		/* Warn only if specified on commandline */
 		if (lsuflag || lsunitflag) {
 			fprintf(stderr,
 	_("log stripe unit (%lld bytes) is too large (maximum is 256KiB)\n"),
-				(lsunit * get_conf_val(OPT_B, B_SIZE)));
+				(get_conf_val(OPT_L, L_SUNIT) *
+				 get_conf_val(OPT_B, B_SIZE)));
 			fprintf(stderr,
 	_("log stripe unit adjusted to 32KiB\n"));
 		}
-		lsunit = (32 * 1024) >> get_conf_val(OPT_B, B_LOG);
+		set_conf_val(OPT_L, L_SUNIT,
+			     (32 * 1024) >> get_conf_val(OPT_B, B_LOG));
 	}
 
 	min_logblocks = max_trans_res(get_conf_val(OPT_D, D_AGSIZE),
@@ -3066,35 +3055,41 @@ an AG size that is one stripe unit smaller, for example %llu.\n"),
 				   get_conf_val(OPT_D, D_SECTLOG),
 				   get_conf_val(OPT_B, B_LOG),
 				   get_conf_val(OPT_I, I_LOG), dirblocklog,
-				   sb_feat.log_version, lsunit, sb_feat.finobt,
+				   sb_feat.log_version,
+				   get_conf_val(OPT_L, L_SUNIT),
+				   sb_feat.finobt,
 				   sb_feat.rmapbt, sb_feat.reflink,
 				   sb_feat.inode_align);
 	ASSERT(min_logblocks);
 	min_logblocks = MAX(XFS_MIN_LOG_BLOCKS, min_logblocks);
-	if (!logbytes &&
+	if (!get_conf_val(OPT_L, L_SIZE) &&
 	    dblocks >= (1024*1024*1024) >> get_conf_val(OPT_B, B_LOG))
 		min_logblocks = MAX(min_logblocks,
 				    XFS_MIN_LOG_BYTES >>
 				    get_conf_val(OPT_B, B_LOG));
-	if (logbytes && xi.logBBsize > 0 && logblocks > DTOBT(xi.logBBsize)) {
+	if (get_conf_val(OPT_L, L_SIZE) && xi.logBBsize > 0 &&
+	    logblocks > DTOBT(xi.logBBsize)) {
 		fprintf(stderr,
 _("size %s specified for log subvolume is too large, maximum is %lld blocks\n"),
 			get_conf_raw_safe(OPT_L, L_SIZE),
 			(long long)DTOBT(xi.logBBsize));
 		usage();
-	} else if (!logbytes && xi.logBBsize > 0) {
+	} else if (!get_conf_val(OPT_L, L_SIZE) && xi.logBBsize > 0) {
 		logblocks = DTOBT(xi.logBBsize);
-	} else if (logbytes && !xi.logdev && !loginternal) {
+	} else if (get_conf_val(OPT_L, L_SIZE) && !xi.logdev &&
+		   !get_conf_val(OPT_L, L_INTERNAL)) {
 		fprintf(stderr,
 			_("size specified for non-existent log subvolume\n"));
 		usage();
-	} else if (loginternal && logbytes && logblocks >= dblocks) {
+	} else if (get_conf_val(OPT_L, L_INTERNAL) &&
+		   get_conf_val(OPT_L, L_SIZE) && logblocks >= dblocks) {
 		fprintf(stderr, _("size %lld too large for internal log\n"),
 			(long long)logblocks);
 		usage();
-	} else if (!loginternal && !xi.logdev) {
+	} else if (!get_conf_val(OPT_L, L_INTERNAL) && !xi.logdev) {
 		logblocks = 0;
-	} else if (loginternal && !logbytes) {
+	} else if (get_conf_val(OPT_L, L_INTERNAL) &&
+		   !get_conf_val(OPT_L, L_SIZE)) {
 
 		if (dblocks < GIGABYTES(1, get_conf_val(OPT_B, B_LOG))) {
 			/* tiny filesystems get minimum sized logs. */
@@ -3158,16 +3153,16 @@ _("size %s specified for log subvolume is too large, maximum is %lld blocks\n"),
 	 */
 	sb_set_features(&mp->m_sb, &sb_feat,
 			get_conf_val(OPT_D, D_SECTSIZE),
-			lsectorsize,
+			get_conf_val(OPT_L, L_SECTSIZE),
 			get_conf_val(OPT_D, D_SUNIT));
 
 
-	if (loginternal) {
+	if (get_conf_val(OPT_L, L_INTERNAL)) {
 		/*
 		 * Readjust the log size to fit within an AG if it was sized
 		 * automatically.
 		 */
-		if (!logbytes) {
+		if (!get_conf_val(OPT_L, L_SIZE)) {
 			logblocks = MIN(logblocks,
 					libxfs_alloc_ag_max_usable(mp));
 
@@ -3185,25 +3180,28 @@ _("size %s specified for log subvolume is too large, maximum is %lld blocks\n"),
 		}
 
 		if (laflag) {
-			if (logagno >= get_conf_val(OPT_D, D_AGCOUNT)) {
+			if (get_conf_val(OPT_L, L_AGNUM) >=
+			    get_conf_val(OPT_D, D_AGCOUNT)) {
 				fprintf(stderr,
-		_("log ag number %d too large, must be less than %lld\n"),
-					logagno,
+	_("log ag number %lld too large, must be less than %lld\n"),
+					get_conf_val(OPT_L, L_AGNUM),
 					get_conf_val(OPT_D, D_AGCOUNT));
 				usage();
 			}
 		} else
-			logagno = (xfs_agnumber_t)(
-					get_conf_val(OPT_D, D_AGCOUNT) / 2);
+			set_conf_val(OPT_L, L_AGNUM, (xfs_agnumber_t)(
+					get_conf_val(OPT_D, D_AGCOUNT) / 2));
 
-		logstart = XFS_AGB_TO_FSB(mp, logagno, libxfs_prealloc_blocks(mp));
+		logstart = XFS_AGB_TO_FSB(mp, get_conf_val(OPT_L, L_AGNUM),
+					  libxfs_prealloc_blocks(mp));
 		/*
 		 * Align the logstart at stripe unit boundary.
 		 */
-		if (lsunit) {
+		if (get_conf_val(OPT_L, L_SUNIT)) {
 			logstart = fixup_internal_log_stripe(mp,
 					lsflag, logstart,
-					get_conf_val(OPT_D, D_AGSIZE), lsunit,
+					get_conf_val(OPT_D, D_AGSIZE),
+					get_conf_val(OPT_L, L_SUNIT),
 					&logblocks,
 					get_conf_val(OPT_B, B_LOG), &lalign);
 		} else if (get_conf_val(OPT_D, D_SUNIT)) {
@@ -3216,8 +3214,9 @@ _("size %s specified for log subvolume is too large, maximum is %lld blocks\n"),
 		}
 	} else {
 		logstart = 0;
-		if (lsunit)
-			fixup_log_stripe_unit(lsflag, lsunit,
+		if (get_conf_val(OPT_L, L_SUNIT))
+			fixup_log_stripe_unit(lsflag,
+					      get_conf_val(OPT_L, L_SUNIT),
 					&logblocks, get_conf_val(OPT_B, B_LOG));
 	}
 	validate_log_size(logblocks, get_conf_val(OPT_B, B_LOG), min_logblocks);
@@ -3249,7 +3248,9 @@ _("size %s specified for log subvolume is too large, maximum is %lld blocks\n"),
 			sb_feat.dir_version, (long long)dirblocksize, sb_feat.nci,
 				sb_feat.dirftype,
 			logfile, 1 << get_conf_val(OPT_B, B_LOG), (long long)logblocks,
-			sb_feat.log_version, "", (long long)lsectorsize, (long long)lsunit,
+			sb_feat.log_version, "",
+			get_conf_val(OPT_L, L_SECTSIZE),
+			get_conf_val(OPT_L, L_SUNIT),
 				sb_feat.lazy_sb_counters,
 			rtfile, rtextblocks << get_conf_val(OPT_B, B_LOG),
 			(long long)rtblocks, (long long)rtextents);
@@ -3290,7 +3291,7 @@ _("size %s specified for log subvolume is too large, maximum is %lld blocks\n"),
 	sbp->sb_ifree = 0;
 	sbp->sb_fdblocks = dblocks -
 		get_conf_val(OPT_D, D_AGCOUNT) * libxfs_prealloc_blocks(mp) -
-		(loginternal ? logblocks : 0);
+		(get_conf_val(OPT_L, L_INTERNAL) ? logblocks : 0);
 	sbp->sb_frextents = 0;	/* will do a free later */
 	sbp->sb_uquotino = sbp->sb_gquotino = sbp->sb_pquotino = 0;
 	sbp->sb_qflags = 0;
@@ -3298,8 +3299,11 @@ _("size %s specified for log subvolume is too large, maximum is %lld blocks\n"),
 	sbp->sb_width = get_conf_val(OPT_D, D_SWIDTH);
 	sbp->sb_dirblklog = dirblocklog - get_conf_val(OPT_B, B_LOG);
 	if (sb_feat.log_version == 2) {	/* This is stored in bytes */
-		lsunit = (lsunit == 0) ? 1 : XFS_FSB_TO_B(mp, lsunit);
-		sbp->sb_logsunit = lsunit;
+		set_conf_val(OPT_L, L_SUNIT,
+			     (get_conf_val(OPT_L, L_SUNIT) == 0) ?
+			     1 : XFS_FSB_TO_B(mp,
+					      get_conf_val(OPT_L, L_SUNIT)));
+		sbp->sb_logsunit = get_conf_val(OPT_L, L_SUNIT);
 	} else
 		sbp->sb_logsunit = 0;
 	if (sb_feat.inode_align) {
@@ -3311,10 +3315,11 @@ _("size %s specified for log subvolume is too large, maximum is %lld blocks\n"),
 		sb_feat.inode_align = sbp->sb_inoalignmt != 0;
 	} else
 		sbp->sb_inoalignmt = 0;
-	if (lsectorsize != BBSIZE ||
+	if (get_conf_val(OPT_L, L_SECTSIZE) != BBSIZE ||
 	    get_conf_val(OPT_D, D_SECTSIZE) != BBSIZE) {
-		sbp->sb_logsectlog = (uint8_t)lsectorlog;
-		sbp->sb_logsectsize = (uint16_t)lsectorsize;
+		sbp->sb_logsectlog = (uint8_t)get_conf_val(OPT_L, L_SECTLOG);
+		sbp->sb_logsectsize =
+			(uint16_t)get_conf_val(OPT_L, L_SECTSIZE);
 	} else {
 		sbp->sb_logsectlog = 0;
 		sbp->sb_logsectsize = 0;
@@ -3322,7 +3327,7 @@ _("size %s specified for log subvolume is too large, maximum is %lld blocks\n"),
 
 	sb_set_features(&mp->m_sb, &sb_feat,
 			get_conf_val(OPT_D, D_SECTSIZE),
-			lsectorsize,
+			get_conf_val(OPT_L, L_SECTSIZE),
 			get_conf_val(OPT_D, D_SUNIT));
 
 	if (force_overwrite)
@@ -3384,7 +3389,8 @@ _("size %s specified for log subvolume is too large, maximum is %lld blocks\n"),
 	libxfs_log_clear(mp->m_logdev_targp, NULL,
 		XFS_FSB_TO_DADDR(mp, logstart),
 		(xfs_extlen_t)XFS_FSB_TO_BB(mp, logblocks),
-		&sbp->sb_uuid, sb_feat.log_version, lsunit, XLOG_FMT, XLOG_INIT_CYCLE, false);
+		&sbp->sb_uuid, sb_feat.log_version,
+		get_conf_val(OPT_L, L_SUNIT), XLOG_FMT, XLOG_INIT_CYCLE, false);
 
 	mp = libxfs_mount(mp, sbp, xi.ddev, xi.logdev, xi.rtdev, 0);
 	if (mp == NULL) {
@@ -3461,7 +3467,8 @@ _("size %s specified for log subvolume is too large, maximum is %lld blocks\n"),
 		if (xfs_sb_version_hascrc(&mp->m_sb))
 			platform_uuid_copy(&agf->agf_uuid, &mp->m_sb.sb_uuid);
 
-		if (loginternal && agno == logagno) {
+		if (get_conf_val(OPT_L, L_INTERNAL) &&
+		    agno == get_conf_val(OPT_L, L_AGNUM)) {
 			be32_add_cpu(&agf->agf_freeblks, -logblocks);
 			agf->agf_longest =
 				cpu_to_be32(get_conf_val(OPT_D, D_AGSIZE) -
@@ -3535,7 +3542,8 @@ _("size %s specified for log subvolume is too large, maximum is %lld blocks\n"),
 
 		arec = XFS_ALLOC_REC_ADDR(mp, block, 1);
 		arec->ar_startblock = cpu_to_be32(libxfs_prealloc_blocks(mp));
-		if (loginternal && agno == logagno) {
+		if (get_conf_val(OPT_L, L_INTERNAL) &&
+		    agno == get_conf_val(OPT_L, L_AGNUM)) {
 			if (lalign) {
 				/*
 				 * Have to insert two records
@@ -3586,7 +3594,8 @@ _("size %s specified for log subvolume is too large, maximum is %lld blocks\n"),
 
 		arec = XFS_ALLOC_REC_ADDR(mp, block, 1);
 		arec->ar_startblock = cpu_to_be32(libxfs_prealloc_blocks(mp));
-		if (loginternal && agno == logagno) {
+		if (get_conf_val(OPT_L, L_INTERNAL) &&
+		    agno == get_conf_val(OPT_L, L_AGNUM)) {
 			if (lalign) {
 				arec->ar_blockcount = cpu_to_be32(
 					XFS_FSB_TO_AGBNO(mp, logstart) -
@@ -3721,7 +3730,8 @@ _("size %s specified for log subvolume is too large, maximum is %lld blocks\n"),
 			}
 
 			/* account for the log space */
-			if (loginternal && agno == logagno) {
+			if (get_conf_val(OPT_L, L_INTERNAL) && agno ==
+			    get_conf_val(OPT_L, L_AGNUM)) {
 				rrec = XFS_RMAP_REC_ADDR(block,
 					be16_to_cpu(block->bb_numrecs) + 1);
 				rrec->rm_startblock = cpu_to_be32(
