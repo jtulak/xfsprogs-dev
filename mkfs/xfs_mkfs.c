@@ -1712,7 +1712,6 @@ main(
 	xfs_mount_t		mbuf;
 	xfs_extlen_t		nbmblocks;
 	int			nlflag;
-	int			norsflag;
 	xfs_alloc_rec_t		*nrec;
 	int			nsflag;
 	int			nvflag;
@@ -1723,10 +1722,8 @@ main(
 	char			*protostring;
 	int			qflag;
 	xfs_rfsblock_t		rtblocks;
-	uint64_t		rtbytes;
 	xfs_extlen_t		rtextblocks;
 	xfs_rtblock_t		rtextents;
-	uint64_t		rtextbytes;
 	char			*rtfile;
 	xfs_sb_t		*sbp;
 	uint64_t		sector_mask;
@@ -1769,9 +1766,8 @@ main(
 	qflag = false;
 	dfile = logfile = rtfile = NULL;
 	protofile = NULL;
-	rtbytes = rtextbytes = 0;
 	lalign = 0;
-	dsflag = norsflag = false;
+	dsflag = false;
 	force_overwrite = false;
 	worst_freelist = 0;
 	memset(&fsx, 0, sizeof(fsx));
@@ -2140,9 +2136,8 @@ main(
 
 				switch (getsubopt(&p, subopts, &value)) {
 				case R_EXTSIZE:
-					rtextbytes = parse_conf_val(OPT_R,
-								    R_EXTSIZE,
-								    value);
+					parse_conf_val(OPT_R, R_EXTSIZE,
+						       value);
 					break;
 				case R_FILE:
 					xi.risfile = parse_conf_val(OPT_R,
@@ -2157,13 +2152,11 @@ main(
 					set_conf_val(OPT_R, R_DEV, 1);
 					break;
 				case R_SIZE:
-					rtbytes = parse_conf_val(OPT_R, R_SIZE,
-								 value);
+					parse_conf_val(OPT_R, R_SIZE, value);
 					break;
 				case R_NOALIGN:
-					norsflag = parse_conf_val(OPT_R,
-								  R_NOALIGN,
-								  value);
+					parse_conf_val(OPT_R, R_NOALIGN,
+						       value);
 					break;
 				default:
 					unknown('r', value);
@@ -2272,7 +2265,10 @@ _("Minimum block size for CRC enabled filesystems is %d bytes.\n"),
 				  !xi.logname, Nflag ? NULL : &xi.lcreat,
 				  force_overwrite, "l");
 	if (xi.rtname)
-		check_device_type(xi.rtname, &xi.risfile, !rtbytes, !xi.rtname,
+		check_device_type(xi.rtname,
+				  &xi.risfile,
+				  !get_conf_val(OPT_R, R_SIZE),
+				  !xi.rtname,
 				  Nflag ? NULL : &xi.rcreat,
 				  force_overwrite, "r");
 	if (xi.disfile || xi.lisfile || xi.risfile)
@@ -2521,33 +2517,36 @@ _("rmapbt not supported with realtime devices\n"));
 				(long long)(logblocks <<
 					   get_conf_val(OPT_B, B_LOG)));
 	}
-	if (rtbytes) {
-		if (rtbytes % XFS_MIN_BLOCKSIZE) {
+	if (get_conf_val(OPT_R, R_SIZE)) {
+		if (get_conf_val(OPT_R, R_SIZE) % XFS_MIN_BLOCKSIZE) {
 			fprintf(stderr,
 			_("illegal rt length %lld, not a multiple of %d\n"),
-				(long long)rtbytes, XFS_MIN_BLOCKSIZE);
+				get_conf_val(OPT_R, R_SIZE), XFS_MIN_BLOCKSIZE);
 			usage();
 		}
-		rtblocks = (xfs_rfsblock_t)(rtbytes >>
+		rtblocks = (xfs_rfsblock_t)(get_conf_val(OPT_R, R_SIZE) >>
 					    get_conf_val(OPT_B, B_LOG));
-		if (rtbytes % get_conf_val(OPT_B, B_SIZE))
+		if (get_conf_val(OPT_R, R_SIZE) % get_conf_val(OPT_B, B_SIZE))
 			fprintf(stderr,
 	_("warning: rt length %lld not a multiple of %lld, truncated to %lld\n"),
-				(long long)rtbytes, get_conf_val(OPT_B, B_SIZE),
+				get_conf_val(OPT_R, R_SIZE),
+				get_conf_val(OPT_B, B_SIZE),
 				(long long)(rtblocks <<
 					   get_conf_val(OPT_B, B_LOG)));
 	}
 	/*
 	 * If specified, check rt extent size against its constraints.
 	 */
-	if (rtextbytes) {
-		if (rtextbytes % get_conf_val(OPT_B, B_SIZE)) {
+	if (get_conf_val(OPT_R, R_EXTSIZE)) {
+		if (get_conf_val(OPT_R, R_EXTSIZE) %
+		    get_conf_val(OPT_B, B_SIZE)) {
 			fprintf(stderr,
 		_("illegal rt extent size %lld, not a multiple of %lld\n"),
-				(long long)rtextbytes, get_conf_val(OPT_B, B_SIZE));
+				get_conf_val(OPT_R, R_EXTSIZE),
+				get_conf_val(OPT_B, B_SIZE));
 			usage();
 		}
-		rtextblocks = (xfs_extlen_t)(rtextbytes >>
+		rtextblocks = (xfs_extlen_t)(get_conf_val(OPT_R, R_EXTSIZE) >>
 					     get_conf_val(OPT_B, B_LOG));
 	} else {
 		/*
@@ -2556,20 +2555,23 @@ _("rmapbt not supported with realtime devices\n"));
 		 * to the stripe width.
 		 */
 		uint64_t	rswidth;
-		uint64_t	rtextbytes;
 
-		if (!norsflag && !xi.risfile && !(!rtbytes && xi.disfile))
+		if (!get_conf_val(OPT_R, R_NOALIGN) && !xi.risfile &&
+		    !(!get_conf_val(OPT_R, R_SIZE) && xi.disfile))
 			rswidth = ft.rtswidth;
 		else
 			rswidth = 0;
 
 		/* check that rswidth is a multiple of fs B_SIZE */
-		if (!norsflag && rswidth &&
+		if (!get_conf_val(OPT_R, R_NOALIGN) && rswidth &&
 		    !(BBTOB(rswidth) % get_conf_val(OPT_B, B_SIZE))) {
 			rswidth = DTOBT(rswidth);
-			rtextbytes = rswidth << get_conf_val(OPT_B, B_LOG);
-			if (XFS_MIN_RTEXTSIZE <= rtextbytes &&
-			    (rtextbytes <= XFS_MAX_RTEXTSIZE)) {
+			set_conf_val(OPT_R, R_EXTSIZE,
+				     rswidth << get_conf_val(OPT_B, B_LOG));
+			if (XFS_MIN_RTEXTSIZE <=
+			    get_conf_val(OPT_R, R_EXTSIZE) &&
+			    (get_conf_val(OPT_R, R_EXTSIZE) <=
+			     XFS_MAX_RTEXTSIZE)) {
 				rtextblocks = rswidth;
 			}
 		}
@@ -2742,7 +2744,7 @@ reported by the device (%u).\n"),
 reported by the device (%u).\n"),
 			get_conf_val(OPT_L, L_SECTSIZE), xi.lbsize);
 	}
-	if (rtbytes && xi.rtsize > 0 &&
+	if (get_conf_val(OPT_R, R_SIZE) && xi.rtsize > 0 &&
 	    xi.rtbsize > get_conf_val(OPT_D, D_SECTSIZE)) {
 		fprintf(stderr, _(
 "Warning: the realtime subvolume sector size %lld is less than the sector size\n\
@@ -2750,16 +2752,17 @@ reported by the device (%u).\n"),
 			get_conf_val(OPT_D, D_SECTSIZE), xi.rtbsize);
 	}
 
-	if (rtbytes && xi.rtsize > 0 && rtblocks > DTOBT(xi.rtsize)) {
+	if (get_conf_val(OPT_R, R_SIZE) && xi.rtsize > 0 &&
+	    rtblocks > DTOBT(xi.rtsize)) {
 		fprintf(stderr,
 			_("size %s specified for rt subvolume is too large, "
 			"maximum is %lld blocks\n"),
 			get_conf_raw_safe(OPT_R, R_SIZE),
 			(long long)DTOBT(xi.rtsize));
 		usage();
-	} else if (!rtbytes && xi.rtsize > 0)
+	} else if (!get_conf_val(OPT_R, R_SIZE) && xi.rtsize > 0)
 		rtblocks = DTOBT(xi.rtsize);
-	else if (rtbytes && !xi.rtdev) {
+	else if (get_conf_val(OPT_R, R_SIZE) && !xi.rtdev) {
 		fprintf(stderr,
 			_("size specified for non-existent rt subvolume\n"));
 		usage();
