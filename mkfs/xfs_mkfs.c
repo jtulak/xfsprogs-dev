@@ -1516,8 +1516,6 @@ main(
 	uint64_t		dasize;
 	xfs_rfsblock_t		dblocks;
 	char			*dfile;
-	uint64_t		dirblocklog;
-	uint64_t		dirblocksize;
 	bool			force_overwrite;
 	struct fsxattr		fsx;
 	bool			ilflag;
@@ -1597,7 +1595,6 @@ main(
 	liflag = laflag = lsflag = lsuflag = lsunitflag = ldflag = lvflag = false;
 	logblocks = rtblocks = rtextblocks = 0;
 	Nflag = nlflag = nsflag = nvflag = false;
-	dirblocklog = dirblocksize = 0;
 	qflag = false;
 	dfile = logfile = rtfile = NULL;
 	protofile = NULL;
@@ -1963,26 +1960,23 @@ main(
 				char	**subopts =
 						(char **)opts[OPT_N].subopts;
 				char	*value;
+				uint64_t tmp;
 
 				switch (getsubopt(&p, subopts, &value)) {
 				case N_LOG:
-					dirblocklog = parse_conf_val(OPT_N,
+					tmp = parse_conf_val(OPT_N,
 								     N_LOG,
 								     value);
-					dirblocksize = 1 << dirblocklog;
+					set_conf_val(OPT_N, N_SIZE, 1 << tmp);
 					nlflag = 1;
-					set_conf_val(OPT_N, N_SIZE,
-						     dirblocksize);
 					break;
 				case N_SIZE:
-					dirblocksize = parse_conf_val(OPT_N,
+					tmp = parse_conf_val(OPT_N,
 								      N_SIZE,
 								      value);
-					dirblocklog =
-						libxfs_highbit32(dirblocksize);
-					nsflag = 1;
 					set_conf_val(OPT_N, N_LOG,
-						     dirblocklog);
+						     libxfs_highbit32(tmp));
+					nsflag = 1;
 					break;
 				case N_VERSION:
 					value = getstr(value, &opts[OPT_N],
@@ -2380,18 +2374,19 @@ _("rmapbt not supported with realtime devices\n"));
 	}
 
 	if (nsflag || nlflag) {
-		if (dirblocksize < get_conf_val(OPT_B, B_SIZE) ||
-					dirblocksize > XFS_MAX_BLOCKSIZE) {
+		if (get_conf_val(OPT_N, N_SIZE) <
+		    get_conf_val(OPT_B, B_SIZE) ||
+		    get_conf_val(OPT_N, N_SIZE) > XFS_MAX_BLOCKSIZE) {
 			fprintf(stderr, _("illegal directory block size %"PRIu64"\n"),
-				dirblocksize);
+				get_conf_val(OPT_N, N_SIZE));
 			usage();
 		}
 	} else {
 		if (get_conf_val(OPT_B, B_SIZE) < (1 << XFS_MIN_REC_DIRSIZE))
-			dirblocklog = XFS_MIN_REC_DIRSIZE;
+			set_conf_val(OPT_N, N_LOG, XFS_MIN_REC_DIRSIZE);
 		else
-			dirblocklog = get_conf_val(OPT_B, B_LOG);
-		dirblocksize = 1 << dirblocklog;
+			set_conf_val(OPT_N, N_LOG, get_conf_val(OPT_B, B_LOG));
+		set_conf_val(OPT_N, N_SIZE, 1 << get_conf_val(OPT_N, N_LOG));
 	}
 
 
@@ -2969,7 +2964,8 @@ an AG size that is one stripe unit smaller, for example %"PRIu64".\n"),
 				   sb_feat.crcs_enabled, sb_feat.dir_version,
 				   get_conf_val(OPT_D, D_SECTLOG),
 				   get_conf_val(OPT_B, B_LOG),
-				   get_conf_val(OPT_I, I_LOG), dirblocklog,
+				   get_conf_val(OPT_I, I_LOG),
+				   get_conf_val(OPT_N, N_LOG),
 				   sb_feat.log_version,
 				   get_conf_val(OPT_L, L_SUNIT),
 				   sb_feat.finobt,
@@ -3159,7 +3155,8 @@ _("size %s specified for log subvolume is too large, maximum is %"PRIu64" blocks
 			get_conf_val(OPT_I, I_MAXPCT),
 			"", get_conf_val(OPT_D, D_SUNIT),
 			get_conf_val(OPT_D, D_SWIDTH),
-			sb_feat.dir_version, dirblocksize, sb_feat.nci,
+			sb_feat.dir_version,
+			get_conf_val(OPT_N, N_SIZE), sb_feat.nci,
 				sb_feat.dirftype,
 			logfile, 1 << get_conf_val(OPT_B, B_LOG), logblocks,
 			sb_feat.log_version, "",
@@ -3211,7 +3208,8 @@ _("size %s specified for log subvolume is too large, maximum is %"PRIu64" blocks
 	sbp->sb_qflags = 0;
 	sbp->sb_unit = get_conf_val(OPT_D, D_SUNIT);
 	sbp->sb_width = get_conf_val(OPT_D, D_SWIDTH);
-	sbp->sb_dirblklog = dirblocklog - get_conf_val(OPT_B, B_LOG);
+	sbp->sb_dirblklog = get_conf_val(OPT_N, N_LOG) -
+		get_conf_val(OPT_B, B_LOG);
 	if (sb_feat.log_version == 2) {	/* This is stored in bytes */
 		set_conf_val(OPT_L, L_SUNIT,
 			     (get_conf_val(OPT_L, L_SUNIT) == 0) ?
